@@ -1,10 +1,12 @@
 import { renderHomePage, bindHomePageEvents } from './pages/home.js';
 import { renderShopPage, bindShopPageEvents } from './pages/shop.js';
 import { renderSciencePage } from './pages/science.js';
-import { renderAboutPage } from './pages/about.js';
+import { renderAboutPage, bindAboutPageEvents } from './pages/about.js';
 import { renderContactPage, bindContactPageEvents } from './pages/contact.js';
 import { renderProfilePage, bindProfilePageEvents } from './pages/profile.js';
+import { renderNotFoundPage, bindNotFoundPageEvents } from './pages/notFound.js';
 import { ScrollCanvasEngine } from './scrollAnimation.js';
+import { state } from './state.js';
 
 export function renderCurrentPage(route) {
   const container = document.getElementById('app-main-content');
@@ -22,6 +24,7 @@ export function renderCurrentPage(route) {
 
     case 'about':
       container.innerHTML = renderAboutPage();
+      bindAboutPageEvents();
       break;
 
     case 'contact':
@@ -30,19 +33,33 @@ export function renderCurrentPage(route) {
       break;
 
     case 'profile':
-      container.innerHTML = renderProfilePage();
-      bindProfilePageEvents();
+      if (state.user) {
+        container.innerHTML = renderProfilePage();
+        bindProfilePageEvents();
+      } else {
+        container.innerHTML = renderHomePage();
+        bindHomePageEvents();
+        setTimeout(() => state.toggleAuthModal(true), 50);
+      }
+      break;
+
+    case '404':
+      container.innerHTML = renderNotFoundPage();
+      bindNotFoundPageEvents();
       break;
 
     case 'home':
-    default:
       container.innerHTML = renderHomePage();
       bindHomePageEvents();
-
-      // Initialize Scroll Canvas Engine on Home Page
       setTimeout(() => {
         new ScrollCanvasEngine('scroll-canvas');
       }, 50);
       break;
+
+    default:
+      container.innerHTML = renderNotFoundPage();
+      bindNotFoundPageEvents();
+      break;
   }
 }
+

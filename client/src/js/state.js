@@ -1,198 +1,210 @@
 import { PRODUCTS } from './productsData.js';
+import {
+  createOrder,
+  getUserDoc,
+  saveUserDoc,
+  logoutUser,
+  subscribeToOrders,
+  subscribeToQueries,
+  saveQueryToDb,
+  updateQueryInDb,
+  updateOrderStatusInDb,
+  isAdminEmail,
+  subscribeToProducts,
+  saveProductToDb,
+  deleteProductFromDb,
+  seedProductsIfEmpty,
+  subscribeToCoupons,
+  saveCouponToDb,
+  updateCouponInDb,
+  deleteCouponFromDb,
+  seedCouponsIfEmpty
+} from './services/firebase.js';
+
+export const DEFAULT_COUPONS = [
+  {
+    id: 'coupon-valeora10',
+    code: 'VALEORA10',
+    discountPercent: 10,
+    minAmount: 499,
+    description: '10% OFF on all luxury jewelry above ₹499',
+    active: true,
+    usesCount: 18,
+    createdAt: '2026-09-20'
+  },
+  {
+    id: 'coupon-royal20',
+    code: 'ROYAL20',
+    discountPercent: 20,
+    minAmount: 999,
+    description: '20% OFF on grand royal jewelry orders above ₹999',
+    active: true,
+    usesCount: 32,
+    createdAt: '2026-09-21'
+  },
+  {
+    id: 'coupon-festive15',
+    code: 'FESTIVE15',
+    discountPercent: 15,
+    minAmount: 749,
+    description: '15% OFF on 18K gold polish orders above ₹749',
+    active: true,
+    usesCount: 12,
+    createdAt: '2026-09-22'
+  }
+];
 
 // ============================================================
-// AURITE CENTRAL REACTIVE STATE & ADMIN STORE
+// VALEORA CENTRAL REACTIVE STATE & STORE
 // ============================================================
 class AppState {
   constructor() {
-    this.cart = JSON.parse(localStorage.getItem('aurite_cart') || '[]');
-    
-    const rawUser = JSON.parse(localStorage.getItem('aurite_user') || 'null');
+    const rawUser = JSON.parse(localStorage.getItem('valeora_user') || 'null');
+    const userEmail = (rawUser?.email || '').toLowerCase();
+    const isStoredAdmin = JSON.parse(localStorage.getItem('valeora_is_admin') || 'false');
+    const isAdminUser = isStoredAdmin || isAdminEmail(userEmail) || rawUser?.role === 'admin';
+
     this.user = rawUser ? {
-      name: rawUser.name || 'Alex Mercer',
-      email: rawUser.email || 'alex@example.com',
-      phone: rawUser.phone || '+91 98765 43210',
-      address: rawUser.address || 'Flat 402, Green Glen Heights, HSR Layout',
-      city: rawUser.city || 'Mumbai',
-      pincode: rawUser.pincode || '400001',
+      uid: rawUser.uid || null,
+      name: rawUser.name || 'Valued Member',
+      email: rawUser.email || '',
+      phone: rawUser.phone || '',
+      address: rawUser.address || '',
+      city: rawUser.city || '',
+      pincode: rawUser.pincode || '',
       country: rawUser.country || 'India',
-      membership: 'Aurite Member',
+      role: isAdminUser ? 'admin' : (rawUser.role || 'customer'),
+      membership: isAdminUser ? 'Administrator' : (rawUser.membership || 'Valeora Member'),
       memberSince: rawUser.memberSince || '2026'
     } : null;
 
-    this.isAdmin = JSON.parse(localStorage.getItem('aurite_is_admin') || 'false');
+    this.isAdmin = isAdminUser;
 
-    // Products synced with local storage or initial PRODUCTS
-    this.products = JSON.parse(localStorage.getItem('aurite_products') || 'null');
-    if (!this.products || !Array.isArray(this.products) || this.products.length === 0) {
-      this.products = [...PRODUCTS];
+    if (this.user && (this.user.email || '').toLowerCase() === 'pooja.sharma@example.com') {
+      this.user = null;
+      this.isAdmin = false;
+      localStorage.removeItem('valeora_user');
+      localStorage.removeItem('valeora_is_admin');
     }
-    // Ensure every product has rich multiple gallery images
-    this.products.forEach(p => {
-      if (!p.images || !Array.isArray(p.images) || p.images.length <= 1) {
-        if (p.id === 'omega-3-triple') {
-          p.images = ["/images/omega3.jpg", "/images/science_capsule.jpg", "/images/hero_banner.jpg", "/images/greens.jpg"];
-        } else if (p.id === 'magnesium-complex') {
-          p.images = ["/images/magnesium.jpg", "/images/science_capsule.jpg", "/images/hero_banner.jpg", "/images/omega3.jpg"];
-        } else if (p.id === 'daily-greens') {
-          p.images = ["/images/greens.jpg", "/images/science_capsule.jpg", "/images/hero_banner.jpg", "/images/magnesium.jpg"];
-        } else {
-          p.images = [p.image || "/images/science_capsule.jpg", "/images/greens.jpg", "/images/hero_banner.jpg", "/images/omega3.jpg"];
-        }
-      }
-      if (!p.highlights || !p.highlights.length) {
-        p.highlights = ["100% Lab Tested & Verified", "Micro-Encapsulated Bio-Delivery", "Zero Artificial Additives", "Certified Pure & Heavy-Metal Free"];
+
+    // User-specific Cart initialization
+    const cartKey = this._getCartStorageKey();
+    const savedCart = localStorage.getItem(cartKey);
+    this.cart = savedCart ? JSON.parse(savedCart) : [];
+
+    this._unsubscribeOrders = null;
+    this._unsubscribeQueries = null;
+
+    // Product catalog loaded from localStorage (filtering out any legacy sample/demo IDs)
+    const sampleProductIds = [
+      'imperial-ruby-choker-masterpiece',
+      'editorial-heritage-necklace',
+      'solitaire-pav-diamond-ring',
+      'diamond-brilliance-bracelet',
+      'grand-victorian-emerald-choker',
+      'for-him-onyx-signet-cufflinks',
+      'men-cuban-curb-chain',
+      'rose-gold-celestial-drop-earrings',
+      'for-her-solitaire-pendant',
+      'men-figaro-hand-bracelet'
+    ];
+    const savedProducts = JSON.parse(localStorage.getItem('valeora_products') || '[]');
+    this.products = Array.isArray(savedProducts)
+      ? savedProducts.filter(p => p && p.id && !sampleProductIds.includes(p.id) && !p._sample && !p._demo)
+      : [];
+    localStorage.setItem('valeora_products', JSON.stringify(this.products));
+
+    // Real-time Firestore Products Sync
+    this._unsubscribeProducts = null;
+    this.initProductsSync();
+
+    // Live Orders: purge legacy sample/demo data so real database orders take over
+    const rawOrders = JSON.parse(localStorage.getItem('valeora_orders') || '[]');
+    this.orders = Array.isArray(rawOrders)
+      ? rawOrders.filter(o => !o._demo && o.id !== 'VAL-9481-2026' && o.id !== 'VAL-2026-D01' && o.id !== 'VAL-2026-D02' && o.userId !== 'sample_pooja_uid' && (o.email || '').toLowerCase() !== 'pooja.sharma@example.com')
+      : [];
+    localStorage.setItem('valeora_orders', JSON.stringify(this.orders));
+
+    // Live Queries: purge legacy sample inquiries so real customer inquiries take over
+    const rawQueries = JSON.parse(localStorage.getItem('valeora_queries') || '[]');
+    this.queries = Array.isArray(rawQueries)
+      ? rawQueries.filter(q => q.id !== 'QRY-101' && q.id !== 'QRY-7102' && (q.email || '').toLowerCase() !== 'pooja.sharma@example.com')
+      : [];
+    localStorage.setItem('valeora_queries', JSON.stringify(this.queries));
+
+    // Purge legacy sample registered users
+    const rawRegUsers = JSON.parse(localStorage.getItem('valeora_registered_users') || '[]');
+    if (Array.isArray(rawRegUsers)) {
+      const cleanRegUsers = rawRegUsers.filter(u =>
+        (u.email || '').toLowerCase() !== 'pooja.sharma@example.com' &&
+        (u.email || '').toLowerCase() !== 'priya.s@techcorp.io' &&
+        (u.email || '').toLowerCase() !== 'ananya.v@lifestyle.in'
+      );
+      localStorage.setItem('valeora_registered_users', JSON.stringify(cleanRegUsers));
+    }
+
+    // Purge legacy sample returns
+    const rawReturns = JSON.parse(localStorage.getItem('valeora_returns') || '[]');
+    if (Array.isArray(rawReturns)) {
+      const cleanReturns = rawReturns.filter(r => r.id !== 'RET-101' && r.orderId !== 'VAL-9481-2026');
+      localStorage.setItem('valeora_returns', JSON.stringify(cleanReturns));
+    }
+
+    this.cleanExpiredResolvedQueries();
+
+    // Start Firestore listeners immediately if user session exists
+    if (this.user) {
+      this.startFirestoreListeners();
+    }
+
+    // Auto-sync un-synced queries to Firestore so other devices get them
+    (this.queries || []).forEach(q => {
+      if (!q.firestoreId && q.message) {
+        saveQueryToDb(q).then(docId => {
+          if (docId) {
+            q.firestoreId = docId;
+            this._persist();
+          }
+        }).catch(e => console.warn('Sync query to firestore:', e));
       }
     });
 
-    // Orders
-    this.orders = JSON.parse(localStorage.getItem('aurite_orders') || JSON.stringify([
-      {
-        id: "AUR-9481-2026",
-        customerName: "Alex Mercer",
-        email: "alex@example.com",
-        phone: "+91 98765 43210",
-        address: "742 Evergreen Terrace, Mumbai, 400001",
-        date: "2026-08-05",
-        status: "Processing",
-        items: [
-          { id: "omega-3-triple", name: "Aurite Omega-3 Triple Strength", qty: 2, unitPrice: 3999, costPrice: 1200 },
-          { id: "magnesium-complex", name: "Aurite Magnesium Complex", qty: 1, unitPrice: 2999, costPrice: 850 }
-        ],
-        total: 10997
-      },
-      {
-        id: "AUR-8920-2026",
-        customerName: "Dr. Marcus Vance",
-        email: "marcus@cardiology.org",
-        phone: "+91 98123 45678",
-        address: "12 Healthcare Enclave, New Delhi, 110001",
-        date: "2026-08-02",
-        status: "Delivered",
-        items: [
-          { id: "omega-3-triple", name: "Aurite Omega-3 Triple Strength", qty: 5, unitPrice: 3999, costPrice: 1200 }
-        ],
-        total: 19995
+    // Auto-sync un-synced orders to Firestore so other devices get them
+    (this.orders || []).forEach(o => {
+      if (o._demo) return; // skip demo/sample orders — don't sync to Firestore
+      if (!o.firestoreId && o.items && o.items.length > 0) {
+        createOrder(o).then(docId => {
+          if (docId) {
+            o.firestoreId = docId;
+            this._persist();
+          }
+        }).catch(e => console.warn('Sync order to firestore:', e));
       }
-    ]));
+    });
 
-    // Customer Support Queries / Live Chat System (Separated from Return/Refund)
-    this.queries = JSON.parse(localStorage.getItem('aurite_queries') || JSON.stringify([
-      {
-        id: "QRY-101",
-        customerName: "Siddharth Malhotra",
-        email: "siddharth@gmail.com",
-        subject: "Dosage query for Magnesium Bisglycinate",
-        message: "Hi, I take this before sleep. Can I combine it with warm milk or should I take it with water?",
-        date: "2026-08-06 14:20",
-        status: "Answered",
-        replies: [
-          { sender: "Admin", text: "Hello Siddharth! You can safely take it with warm milk or water 30 minutes before sleep.", time: "2026-08-06 15:05" }
-        ]
-      },
-      {
-        id: "QRY-102",
-        customerName: "Priya Sharma",
-        email: "priya.s@techcorp.io",
-        subject: "Order shipment tracking #AUR-9481",
-        message: "When will my order arrive in Mumbai?",
-        date: "2026-08-07 10:15",
-        status: "Open",
-        replies: []
-      }
-    ]));
-
-    // Return & Refund System with dedicated Chat Thread
-    this.returns = JSON.parse(localStorage.getItem('aurite_returns') || JSON.stringify([
-      {
-        id: "RET-701",
-        orderId: "AUR-8920-2026",
-        productId: "omega-3-triple",
-        productName: "Aurite Omega-3 Triple Strength",
-        customerName: "Dr. Marcus Vance",
-        email: "marcus@cardiology.org",
-        phone: "+91 98123 45678",
-        reason: "Damaged Outer Packaging / Broken Seal",
-        details: "Two bottles had compromised security seals on delivery. Requesting replacement or refund for ₹19,995.",
-        amount: 19995,
-        status: "Under Review",
-        date: "2026-08-06",
-        chat: [
-          { sender: "Customer", text: "Two bottles had compromised security seals on delivery. Requesting replacement or refund for ₹19,995.", time: "2026-08-06 14:20" },
-          { sender: "Admin", text: "Hello Dr. Vance! Thank you for informing us. We apologize for the courier transit issue. Our returns department is reviewing your request.", time: "2026-08-06 15:05" }
-        ]
-      }
-    ]));
-
-    // Customer Reviews
-    this.reviews = JSON.parse(localStorage.getItem('aurite_reviews') || JSON.stringify([
-      {
-        id: "REV-001",
-        productId: "omega-3-triple",
-        orderId: "AUR-8920-2026",
-        customerName: "Dr. Marcus Vance",
-        rating: 5,
-        text: "Outstanding formulation. The enteric shielding completely eliminates the fishy aftertaste common with other brands. My triglyceride levels have improved significantly.",
-        date: "2026-08-04"
-      },
-      {
-        id: "REV-002",
-        productId: "magnesium-complex",
-        orderId: "AUR-9481-2026",
-        customerName: "Alex Mercer",
-        rating: 4,
-        text: "Very effective for muscle recovery after intense workouts. The capsules are a bit large but the bio-availability is definitely noticeable.",
-        date: "2026-08-06"
-      }
-    ]));
-
-    // Registered Users Management & Access Control
-    this.users = JSON.parse(localStorage.getItem('aurite_users') || JSON.stringify([
-      {
-        id: "USR-101",
-        name: "Alex Mercer",
-        email: "alex@example.com",
-        phone: "+91 98765 43210",
-        address: "742 Evergreen Terrace, Mumbai, 400001",
-        joinedDate: "2026-01-15",
-        isBlocked: false,
-        ordersCount: 3,
-        totalSpent: 28494
-      },
-      {
-        id: "USR-102",
-        name: "Dr. Marcus Vance",
-        email: "marcus@cardiology.org",
-        phone: "+91 98123 45678",
-        address: "12 Healthcare Enclave, New Delhi, 110001",
-        joinedDate: "2026-03-22",
-        isBlocked: false,
-        ordersCount: 2,
-        totalSpent: 39990
-      },
-      {
-        id: "USR-103",
-        name: "Priya Sharma",
-        email: "priya.s@techcorp.io",
-        phone: "+91 98450 11223",
-        address: "88 Cyber City Heights, Bangalore, 560001",
-        joinedDate: "2026-05-10",
-        isBlocked: false,
-        ordersCount: 1,
-        totalSpent: 4499
-      }
-    ]));
+    // Coupons and Promotions initialization
+    const savedCoupons = localStorage.getItem('valeora_coupons');
+    this.coupons = savedCoupons ? JSON.parse(savedCoupons) : DEFAULT_COUPONS;
+    this.appliedCoupon = JSON.parse(localStorage.getItem('valeora_applied_coupon') || 'null');
+    this.discountPercent = this.appliedCoupon ? this.appliedCoupon.discountPercent : 0;
+    this.couponFeedback = null;
 
     this.currentRoute = 'home';
+    this.isMobileMenuOpen = false;
     this.isCartOpen = false;
     this.isAuthOpen = false;
     this.isCheckoutOpen = false;
+    this.policyModalType = null;
     this.quickViewProduct = null;
-    this.couponCode = null;
-    this.discountPercent = 0;
+
+    // Delivery settings
+    this.freeDeliveryThreshold = 999;
+    this.standardShippingFee = 79;
 
     this._changeFlags = {};
     this._listeners = new Set();
+
+    this.initCouponsSync();
   }
 
   subscribe(cb) {
@@ -206,16 +218,288 @@ class AppState {
     this._listeners.forEach(cb => cb(this, flags));
   }
 
+  _getCartStorageKey(uid = this.user?.uid) {
+    return uid ? `valeora_cart_${uid}` : 'valeora_cart_guest';
+  }
+
   _persist() {
-    localStorage.setItem('aurite_cart', JSON.stringify(this.cart));
-    localStorage.setItem('aurite_user', JSON.stringify(this.user));
-    localStorage.setItem('aurite_is_admin', JSON.stringify(this.isAdmin));
-    localStorage.setItem('aurite_products', JSON.stringify(this.products));
-    localStorage.setItem('aurite_orders', JSON.stringify(this.orders));
-    localStorage.setItem('aurite_queries', JSON.stringify(this.queries));
-    localStorage.setItem('aurite_returns', JSON.stringify(this.returns));
-    localStorage.setItem('aurite_reviews', JSON.stringify(this.reviews));
-    localStorage.setItem('aurite_users', JSON.stringify(this.users));
+    const cartKey = this._getCartStorageKey();
+    localStorage.setItem(cartKey, JSON.stringify(this.cart));
+    localStorage.setItem('valeora_user', JSON.stringify(this.user));
+    localStorage.setItem('valeora_is_admin', JSON.stringify(this.isAdmin));
+    localStorage.setItem('valeora_orders', JSON.stringify(this.orders));
+    localStorage.setItem('valeora_queries', JSON.stringify(this.queries));
+    localStorage.setItem('valeora_products', JSON.stringify(this.products));
+    localStorage.setItem('valeora_coupons', JSON.stringify(this.coupons));
+    localStorage.setItem('valeora_applied_coupon', JSON.stringify(this.appliedCoupon));
+
+    // Cross-device cart cloud synchronization
+    if (this.user?.uid) {
+      saveUserDoc(this.user.uid, { cart: this.cart }).catch(e => console.warn('Firestore cart sync:', e));
+    }
+  }
+
+  setRoute(route) {
+    let normalized = route || 'home';
+    if (normalized === 'admin/login') normalized = 'admin-login';
+    this.currentRoute = normalized;
+    this.isMobileMenuOpen = false;
+
+    if (typeof window !== 'undefined') {
+      let targetUrl = '/';
+      if (this.currentRoute === 'admin-login') {
+        targetUrl = '/admin/login';
+      } else if (this.currentRoute === 'admin') {
+        targetUrl = '/admin';
+      } else if (this.currentRoute === 'home') {
+        targetUrl = '/';
+      } else if (this.currentRoute === '404') {
+        targetUrl = window.location.pathname || '/404';
+      } else {
+        targetUrl = `/${this.currentRoute}`;
+      }
+
+      if (window.location.hash || window.location.pathname !== targetUrl) {
+        history.replaceState(null, '', targetUrl);
+      }
+    }
+    this._notify({ route: true, navbar: true, mobileMenu: true });
+  }
+
+  initProductsSync() {
+    try {
+      this._unsubscribeProducts = subscribeToProducts((liveProds) => {
+        if (Array.isArray(liveProds)) {
+          const sampleProductIds = [
+            'imperial-ruby-choker-masterpiece',
+            'editorial-heritage-necklace',
+            'solitaire-pav-diamond-ring',
+            'diamond-brilliance-bracelet',
+            'grand-victorian-emerald-choker',
+            'for-him-onyx-signet-cufflinks',
+            'men-cuban-curb-chain',
+            'rose-gold-celestial-drop-earrings',
+            'for-her-solitaire-pendant',
+            'men-figaro-hand-bracelet'
+          ];
+          this.products = liveProds.filter(p => p && p.id && !sampleProductIds.includes(p.id) && !p._sample && !p._demo);
+          this._persist();
+          this._notify({ products: true });
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to sync products with Firestore:', err);
+    }
+  }
+
+  addProduct(productData) {
+    const slug = (productData.name || 'product')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    const id = `${slug}-${Date.now()}`;
+    const newProduct = {
+      id,
+      name: productData.name,
+      tagline: productData.tagline || '18K Gold Finish · Sparkling Crystal Gemstones',
+      category: productData.category || 'Necklaces',
+      subcategory: productData.subcategory || 'Necklace',
+      audience: productData.audience || 'her',
+      price: Number(productData.price) || 299,
+      originalPrice: Number(productData.originalPrice) || ((Number(productData.price) || 299) * 2),
+      costPrice: Number(productData.costPrice) || Math.round((Number(productData.price) || 299) * 0.35),
+      stockQty: Number(productData.stockQty) || 30,
+      rating: Number(productData.rating) || 4.98,
+      reviewsCount: Number(productData.reviewsCount) || Math.floor(25 + Math.random() * 80),
+      badge: productData.badge || 'New Arrival',
+      image: productData.image || '/images/imperial_necklace.jpg',
+      galleryImages: productData.galleryImages || [productData.image || '/images/imperial_necklace.jpg'],
+      servings: productData.servings || 'Adjustable Comfort Fit',
+      description: productData.description || 'A stunning statement jewelry piece handcrafted with anti-fade mirror polish and sparkling simulated crystal stones.',
+      highlights: Array.isArray(productData.highlights) ? productData.highlights : (
+        productData.highlights ? productData.highlights.split(',').map(s => s.trim()).filter(Boolean) : [
+          'Long-lasting mirror polish that will not fade',
+          'Premium 18K gold / silver rhodium coat',
+          'Hypoallergenic, lead-free and nickel-free (skin safe)',
+          'Free luxury gift box included with every order'
+        ]
+      ),
+      supplementFacts: {
+        servingSize: 'Standard Adjustable Fit',
+        servingsPerContainer: 'Daily & Festive Wear',
+        ingredients: [
+          { name: 'Base Metal', amount: 'Skin-Safe Hypoallergenic Alloy', dv: 'Safe' },
+          { name: 'Plating', amount: 'Premium 18K Polish Coat', dv: 'Anti-Fade' },
+          { name: 'Gems', amount: 'Brilliant Cut Crystal Stones', dv: 'Diamond Shine' }
+        ]
+      }
+    };
+
+    this.products.unshift(newProduct);
+    this._persist();
+    this._notify({ products: true });
+    saveProductToDb(newProduct).catch(e => console.warn('Firestore add product:', e));
+    return newProduct;
+  }
+
+  updateProduct(productId, updatedData) {
+    const idx = this.products.findIndex(item => item.id === productId);
+    if (idx > -1) {
+      const parsedHighlights = Array.isArray(updatedData.highlights)
+        ? updatedData.highlights
+        : (updatedData.highlights ? updatedData.highlights.split(',').map(s => s.trim()).filter(Boolean) : this.products[idx].highlights);
+
+      this.products[idx] = {
+        ...this.products[idx],
+        ...updatedData,
+        subcategory: updatedData.subcategory || this.products[idx].subcategory || this.products[idx].category,
+        highlights: parsedHighlights,
+        image: updatedData.image || this.products[idx].image,
+        galleryImages: Array.isArray(updatedData.galleryImages) && updatedData.galleryImages.length > 0
+          ? updatedData.galleryImages
+          : (updatedData.image ? [updatedData.image] : this.products[idx].galleryImages),
+        price: Number(updatedData.price) || this.products[idx].price,
+        originalPrice: Number(updatedData.originalPrice) || this.products[idx].originalPrice,
+        costPrice: Number(updatedData.costPrice) || this.products[idx].costPrice,
+        stockQty: updatedData.stockQty !== undefined ? Math.max(0, Number(updatedData.stockQty) || 0) : this.products[idx].stockQty
+      };
+      this._persist();
+      this._notify({ products: true });
+      saveProductToDb(this.products[idx]).catch(e => console.warn('Firestore update product:', e));
+      return this.products[idx];
+    }
+  }
+
+  updateProductStock(productId, newQty) {
+    const p = this.products.find(item => item.id === productId);
+    if (p) {
+      p.stockQty = Math.max(0, Number(newQty) || 0);
+      this._persist();
+      this._notify({ products: true });
+      saveProductToDb(p).catch(e => console.warn('Firestore update stock:', e));
+      return p;
+    }
+  }
+
+  deleteProduct(productId) {
+    this.products = this.products.filter(item => item.id !== productId);
+    this._persist();
+    this._notify({ products: true });
+    deleteProductFromDb(productId).catch(e => console.warn('Firestore delete product:', e));
+  }
+
+  toggleMobileMenu(open) {
+    this.isMobileMenuOpen = open !== undefined ? open : !this.isMobileMenuOpen;
+    this._notify({ mobileMenu: true, navbar: true });
+  }
+
+  setFirebaseUser(firebaseUser, firestoreData = null) {
+    if (!firebaseUser) {
+      this.user = null;
+      this.isAdmin = false;
+      if (this._unsubscribeOrders) { this._unsubscribeOrders(); this._unsubscribeOrders = null; }
+      if (this._unsubscribeQueries) { this._unsubscribeQueries(); this._unsubscribeQueries = null; }
+      localStorage.removeItem('valeora_user');
+      localStorage.removeItem('valeora_is_admin');
+
+      // Switch back to guest cart
+      const guestCart = localStorage.getItem('valeora_cart_guest');
+      this.cart = guestCart ? JSON.parse(guestCart) : [];
+      this._persist();
+      this._notify({ user: true, auth: true, navbar: true, cart: true });
+      return;
+    }
+
+    const email = (firebaseUser.email || firestoreData?.email || '').toLowerCase();
+    const isAdminUser = isAdminEmail(email) || firestoreData?.role === 'admin';
+    this.isAdmin = isAdminUser;
+
+    const rawName = firestoreData?.name || firebaseUser.displayName || (email ? email.split('@')[0] : 'Valued Patron');
+    const displayName = isAdminUser ? 'Valeora Administrator' : rawName;
+    const phone = firestoreData?.phone || firebaseUser.phoneNumber || '';
+    const address = firestoreData?.address || '';
+    const city = firestoreData?.city || '';
+    const pincode = firestoreData?.pincode || '';
+    const country = firestoreData?.country || 'India';
+
+    this.user = {
+      uid: firebaseUser.uid,
+      name: displayName,
+      email: email || 'patron@valeora.com',
+      phone: phone,
+      address: address,
+      city: city,
+      pincode: pincode,
+      country: country,
+      role: isAdminUser ? 'admin' : 'customer',
+      membership: isAdminUser ? 'Administrator' : (firestoreData?.membership || 'Valeora Member'),
+      memberSince: firestoreData?.memberSince || new Date().getFullYear().toString()
+    };
+
+    // Load user-specific cart from Firestore (for seamless cross-device syncing) or local fallback
+    const userCartKey = `valeora_cart_${firebaseUser.uid}`;
+    const savedUserCart = localStorage.getItem(userCartKey);
+    if (firestoreData && Array.isArray(firestoreData.cart) && firestoreData.cart.length > 0) {
+      this.cart = firestoreData.cart;
+    } else if (savedUserCart) {
+      this.cart = JSON.parse(savedUserCart);
+    } else {
+      this.cart = [];
+    }
+
+    this._persist();
+    this.startFirestoreListeners();
+    this._notify({ user: true, auth: true, navbar: true, cart: true });
+  }
+
+  startFirestoreListeners() {
+    if (this._unsubscribeOrders) { this._unsubscribeOrders(); this._unsubscribeOrders = null; }
+    if (this._unsubscribeQueries) { this._unsubscribeQueries(); this._unsubscribeQueries = null; }
+
+    const targetUserId = this.isAdmin ? null : (this.user?.uid || null);
+    const targetEmail = this.isAdmin ? null : (this.user?.email || null);
+
+    // Live Order synchronization directly from Cloud Firestore (cross-device)
+    this._unsubscribeOrders = subscribeToOrders((liveOrders) => {
+      if (Array.isArray(liveOrders)) {
+        this.orders = liveOrders;
+        this._persist();
+        this._notify({ orders: true });
+      }
+    }, targetUserId, targetEmail);
+
+    // Live Customer Query synchronization directly from Cloud Firestore
+    this._unsubscribeQueries = subscribeToQueries((liveQueries) => {
+      if (Array.isArray(liveQueries)) {
+        this.queries = liveQueries;
+        this._persist();
+        this._notify({ queries: true });
+      }
+    });
+  }
+
+  updateUserProfile(updates) {
+    if (!this.user) return;
+    this.user = {
+      ...this.user,
+      ...updates
+    };
+
+    // Update in registered users list as well
+    const registered = JSON.parse(localStorage.getItem('valeora_registered_users') || '[]');
+    const idx = registered.findIndex(u => u.email?.toLowerCase() === this.user.email?.toLowerCase());
+    if (idx > -1) {
+      registered[idx] = { ...registered[idx], ...this.user };
+      localStorage.setItem('valeora_registered_users', JSON.stringify(registered));
+    }
+
+    if (this.user.uid) {
+      saveUserDoc(this.user.uid, this.user);
+    }
+
+    this._persist();
+    this._notify({ user: true });
+    return this.user;
   }
 
   updateUserAddress(address, city, pincode, country) {
@@ -224,242 +508,176 @@ class AppState {
     this.user.city = city;
     this.user.pincode = pincode;
     this.user.country = country || 'India';
-    const existing = (this.users || []).find(u => u.email === this.user.email);
-    if (existing) {
-      existing.address = `${address}, ${city} - ${pincode}, ${country || 'India'}`;
+
+    if (this.user.uid) {
+      saveUserDoc(this.user.uid, {
+        address,
+        city,
+        pincode,
+        country: country || 'India'
+      });
     }
+
     this._persist();
     this._notify({ user: true });
   }
 
-  // ---- Registered Users & Access Management ----
-  toggleBlockUser(userId) {
-    const u = (this.users || []).find(item => item.id === userId);
-    if (u) {
-      u.isBlocked = !u.isBlocked;
-      // If currently logged-in user is blocked, force logout
-      if (this.user && this.user.email === u.email && u.isBlocked) {
-        this.user = null;
-      }
-      this._notify({ users: true, user: true });
-      return u;
-    }
-    return null;
-  }
-
-  // ---- Admin Methods ----
-  loginAdmin(email, password) {
-    if ((email === 'admin@aurite.com' || email === 'admin') && password === 'admin123') {
-      this.isAdmin = true;
-      this._notify({ admin: true, navbar: true });
-      return { success: true };
-    }
-    return { success: false, message: 'Invalid Admin Email or Password' };
-  }
-
-  logoutAdmin() {
-    this.isAdmin = false;
-    this._notify({ admin: true, navbar: true });
-  }
-
-  addProduct(newProd) {
-    this.products.unshift(newProd);
-    this._notify({ products: true });
-  }
-
-  updateProduct(id, updatedFields) {
-    const idx = this.products.findIndex(p => p.id === id);
-    if (idx > -1) {
-      this.products[idx] = { ...this.products[idx], ...updatedFields };
-      this._notify({ products: true });
-    }
-  }
-
-  deleteProduct(id) {
-    this.products = this.products.filter(p => p.id !== id);
-    this._notify({ products: true });
-  }
-
-  updateOrderStatus(orderId, newStatus) {
-    const order = this.orders.find(o => o.id === orderId);
-    if (order) {
-      order.status = newStatus;
-      this._notify({ orders: true });
-    }
-  }
-
-  addCustomerQuery(customerName, email, subject, message) {
-    const q = {
-      id: `QRY-${Math.floor(100 + Math.random() * 900)}`,
-      customerName,
-      email,
-      subject,
+  submitQuery({ subject, category, orderId, message, customerName, email }) {
+    const now = new Date();
+    const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    const newQuery = {
+      id: `QRY-${Math.floor(1000 + Math.random() * 9000)}`,
+      userId: this.user?.uid || null,
+      customerName: customerName || this.user?.name || 'Valued Patron',
+      email: email || this.user?.email || '',
+      subject: subject || 'General Query',
+      category: category || 'Order Assistance',
+      orderId: orderId || null,
       message,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: "Open",
-      replies: []
-    };
-    this.queries.unshift(q);
-    this._notify({ queries: true });
-  }
-
-  replyToQuery(queryId, replyMessage) {
-    const q = this.queries.find(item => item.id === queryId);
-    if (q) {
-      q.replies.push({
-        sender: "Admin",
-        text: replyMessage,
-        time: new Date().toISOString().replace('T', ' ').substring(0, 16)
-      });
-      q.status = "Answered";
-      this._notify({ queries: true });
-    }
-  }
-
-  requestReturn(orderId, productId, productName, reason, details, amount, phone) {
-    const retId = `RET-${Math.floor(100 + Math.random() * 900)}`;
-    const custName = this.user ? this.user.name : "Valued Customer";
-    const custEmail = this.user ? this.user.email : "customer@aurite.com";
-    const custPhone = phone || (this.user ? this.user.phone : "+91 98765 43210");
-
-    const newReturn = {
-      id: retId,
-      orderId,
-      productId,
-      productName,
-      customerName: custName,
-      email: custEmail,
-      phone: custPhone,
-      reason,
-      details,
-      amount: amount || 0,
-      status: "Requested",
-      date: new Date().toISOString().substring(0, 10),
-      chat: [
-        {
-          sender: "Customer",
-          text: `Return & Refund Request submitted for Order #${orderId} (${productName}).\nReason: ${reason}\nDetails: ${details}\nRefund Amount: ₹${Number(amount).toLocaleString('en-IN')}`,
-          time: new Date().toISOString().replace('T', ' ').substring(0, 16)
-        },
-        {
-          sender: "Admin",
-          text: `Your request #${retId} has been received. Our returns team will inspect the details and update the decision here. You can discuss the issue with us right here in this chat!`,
-          time: new Date().toISOString().replace('T', ' ').substring(0, 16)
-        }
+      date: formattedDate,
+      status: "In Review",
+      response: "",
+      messages: [
+        { sender: 'You', text: message, time: `${formattedDate} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}` }
       ]
     };
 
-    if (!this.returns) this.returns = [];
-    this.returns.unshift(newReturn);
+    this.queries.unshift(newQuery);
+    this._persist();
+    this._notify({ queries: true });
 
-    this._notify({ returns: true, orders: true });
-    return { returnId: retId };
+    saveQueryToDb(newQuery).then(docId => {
+      if (docId) newQuery.firestoreId = docId;
+    }).catch(e => console.warn('Firestore query save:', e));
+
+    return newQuery;
   }
 
-  replyToReturnChat(returnId, text, sender = "Admin") {
-    const ret = (this.returns || []).find(r => r.id === returnId);
-    if (ret) {
-      if (!ret.chat) ret.chat = [];
-      ret.chat.push({
-        sender,
-        text,
-        time: new Date().toISOString().replace('T', ' ').substring(0, 16)
-      });
-      this._notify({ returns: true });
+  addQueryMessage(queryId, text, sender = 'You') {
+    const q = (this.queries || []).find(item => item.id === queryId || item.firestoreId === queryId);
+    if (!q) return null;
+    const now = new Date();
+    const timeFormatted = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    if (!q.messages || !Array.isArray(q.messages)) {
+      q.messages = [];
+      if (q.message) {
+        q.messages.push({ sender: 'You', text: q.message, time: q.date ? `${q.date} 10:00` : timeFormatted });
+      }
+      if (q.response) {
+        q.messages.push({ sender: 'Valeora Concierge', text: q.response, time: timeFormatted });
+      }
     }
-  }
 
-  updateReturnStatus(returnId, newStatus, adminNote = "") {
-    const ret = (this.returns || []).find(r => r.id === returnId);
-    if (ret) {
-      ret.status = newStatus;
-      if (!ret.chat) ret.chat = [];
-      ret.chat.push({
-        sender: "Admin",
-        text: `Status updated to "${newStatus}". ${adminNote ? adminNote : 'Action has been recorded by our returns department.'}`,
-        time: new Date().toISOString().replace('T', ' ').substring(0, 16)
-      });
-      this._notify({ returns: true });
+    q.messages.push({ sender, text, time: timeFormatted });
+    if (sender === 'You') {
+      q.status = 'In Review';
+    } else {
+      q.status = 'Answered';
+      q.response = text;
     }
+    this._persist();
+    this._notify({ queries: true });
+
+    // Sync to Firestore
+    updateQueryInDb(q.firestoreId || q.id, {
+      messages: q.messages,
+      status: q.status,
+      response: q.response || ''
+    }).catch(e => console.warn('Firestore update message:', e));
+
+    return q;
   }
 
-  updateUserPhone(newPhone) {
-    if (!this.user) {
-      this.user = { name: 'Alex Mercer', email: 'alex@example.com', membership: 'Aurite Member', memberSince: '2026' };
+  deleteQuery(queryId) {
+    this.queries = (this.queries || []).filter(q => q.id !== queryId && q.firestoreId !== queryId);
+    this._persist();
+    this._notify({ queries: true });
+  }
+
+  updateQueryStatus(queryId, newStatus) {
+    const q = (this.queries || []).find(item => item.id === queryId || item.firestoreId === queryId);
+    if (!q) return null;
+    q.status = newStatus;
+    const statusLower = (newStatus || '').toLowerCase();
+    if (statusLower === 'resolved' || statusLower === 'closed') {
+      q.resolvedAt = q.resolvedAt || Date.now();
+    } else {
+      delete q.resolvedAt;
     }
-    this.user.phone = newPhone;
-    this._notify({ user: true });
+    this._persist();
+    this._notify({ queries: true });
+
+    updateQueryInDb(q.firestoreId || q.id, {
+      status: newStatus,
+      resolvedAt: q.resolvedAt || null
+    }).catch(e => console.warn('Firestore update status:', e));
+
+    return q;
   }
 
-  addReview(productId, orderId, rating, text, customerName) {
-    const review = {
-      id: `REV-${Math.floor(100 + Math.random() * 900)}`,
-      productId,
-      orderId,
-      customerName,
-      rating,
-      text,
-      date: new Date().toISOString().substring(0, 10)
-    };
-    this.reviews.unshift(review);
-    
-    // Update product rating and reviewsCount
-    const product = this.products.find(p => p.id === productId);
-    if (product) {
-      const pReviews = this.reviews.filter(r => r.productId === productId);
-      const totalRating = pReviews.reduce((sum, r) => sum + r.rating, 0);
-      product.rating = (totalRating / pReviews.length).toFixed(1);
-      product.reviewsCount = pReviews.length;
-    }
-    this._notify({ reviews: true, products: true });
-  }
+  cleanExpiredResolvedQueries() {
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const initialLen = (this.queries || []).length;
 
-  getAnalytics() {
-    let totalRevenue = 0;
-    let totalCost = 0;
+    this.queries = (this.queries || []).filter(q => {
+      const statusLower = (q.status || '').toLowerCase();
+      const isResolved = statusLower === 'resolved' || statusLower === 'closed';
+      if (!isResolved) return true;
 
-    this.orders.forEach(order => {
-      totalRevenue += (order.total || 0);
-      (order.items || []).forEach(item => {
-        const prod = this.products.find(p => p.id === item.id || p.name === item.name);
-        const unitCost = (item.costPrice !== undefined && item.costPrice > 0) ? item.costPrice : (prod && prod.costPrice ? prod.costPrice : (item.unitPrice || 1000) * 0.35);
-        totalCost += unitCost * (item.qty || 1);
-      });
+      // 1. If explicit resolvedAt timestamp is saved
+      if (q.resolvedAt) {
+        const elapsed = now - Number(q.resolvedAt);
+        return elapsed < ONE_DAY_MS;
+      }
+
+      // 2. If query date exists in DD/MM/YYYY format
+      if (q.date) {
+        try {
+          const parts = q.date.split('/');
+          if (parts.length === 3) {
+            const qDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+            if (!isNaN(qDate.getTime())) {
+              const elapsed = now - qDate.getTime();
+              // If older than 1 day (24 hours), auto delete
+              return elapsed < ONE_DAY_MS;
+            }
+          }
+        } catch (e) { }
+      }
+
+      return true;
     });
 
-    if (totalCost === 0 && totalRevenue > 0) {
-      totalCost = Math.round(totalRevenue * 0.35);
+    if (this.queries.length !== initialLen) {
+      this._persist();
     }
-
-    const netProfit = Math.max(0, totalRevenue - totalCost);
-    const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
-    const lowStockCount = this.products.filter(p => (p.stockQty || 0) < 15).length;
-
-    return {
-      totalRevenue,
-      totalCost,
-      netProfit,
-      profitMargin,
-      totalOrders: this.orders.length,
-      lowStockCount
-    };
   }
 
-  // ---- Cart ----
-  addToCart(product, purchaseType = 'one-time', qty = 1) {
-    const idx = this.cart.findIndex(i => i.id === product.id && i.purchaseType === purchaseType);
-    const unitPrice = purchaseType === 'subscription' ? product.subscribePrice : product.price;
+  addToCart(product, purchaseType = 'standard', qty = 1) {
+    const idx = this.cart.findIndex(i => i.id === product.id);
+    const unitPrice = product.price;
     if (idx > -1) {
       this.cart[idx].qty += qty;
     } else {
-      this.cart.push({ id: product.id, name: product.name, tagline: product.tagline, image: product.image, unitPrice, costPrice: product.costPrice || unitPrice * 0.35, purchaseType, qty });
+      this.cart.push({
+        id: product.id,
+        name: product.name,
+        tagline: product.tagline,
+        image: product.image,
+        unitPrice,
+        costPrice: product.costPrice || unitPrice * 0.4,
+        purchaseType,
+        qty
+      });
     }
     this.isCartOpen = true;
     this._notify({ cart: true });
   }
 
   updateCartQty(id, purchaseType, qty) {
-    const idx = this.cart.findIndex(i => i.id === id && i.purchaseType === purchaseType);
+    const idx = this.cart.findIndex(i => i.id === id);
     if (idx > -1) {
       if (qty <= 0) this.cart.splice(idx, 1);
       else this.cart[idx].qty = qty;
@@ -468,7 +686,7 @@ class AppState {
   }
 
   removeCartItem(id, purchaseType) {
-    this.cart = this.cart.filter(i => !(i.id === id && i.purchaseType === purchaseType));
+    this.cart = this.cart.filter(i => i.id !== id);
     this._notify({ cart: true });
   }
 
@@ -481,9 +699,179 @@ class AppState {
     return this.cart.reduce((s, i) => s + i.unitPrice * i.qty, 0);
   }
 
+  getCartDiscount() {
+    if (!this.appliedCoupon) return 0;
+    const subtotal = this.getCartSubtotal();
+    const minReq = Number(this.appliedCoupon.minAmount) || 0;
+    if (subtotal < minReq) return 0;
+    const percent = Number(this.appliedCoupon.discountPercent) || 0;
+    return Math.round((subtotal * percent) / 100);
+  }
+
+  getCartShipping() {
+    const sub = this.getCartSubtotal();
+    if (sub === 0) return 0;
+    return sub >= this.freeDeliveryThreshold ? 0 : this.standardShippingFee;
+  }
+
   getCartTotal() {
     const sub = this.getCartSubtotal();
-    return Math.max(0, sub - (sub * this.discountPercent) / 100);
+    if (sub === 0) return 0;
+    const discount = this.getCartDiscount();
+    const netSubtotal = Math.max(0, sub - discount);
+    return netSubtotal + this.getCartShipping();
+  }
+
+  initCouponsSync() {
+    try {
+      this._unsubscribeCoupons = subscribeToCoupons((liveCoupons) => {
+        if (Array.isArray(liveCoupons) && liveCoupons.length > 0) {
+          this.coupons = liveCoupons;
+          if (this.appliedCoupon) {
+            const matched = this.coupons.find(c => c.code === this.appliedCoupon.code && c.active);
+            if (!matched) {
+              this.appliedCoupon = null;
+              this.discountPercent = 0;
+            } else {
+              this.appliedCoupon = matched;
+              this.discountPercent = matched.discountPercent;
+            }
+          }
+          this._persist();
+          this._notify({ coupons: true, cart: true });
+        }
+      });
+      seedCouponsIfEmpty(DEFAULT_COUPONS);
+    } catch (err) {
+      console.warn('Coupons sync initialization error:', err);
+    }
+  }
+
+  addCoupon(couponData) {
+    const code = (couponData.code || '').trim().toUpperCase();
+    if (!code) return { success: false, message: 'Coupon code is required.' };
+    const id = `coupon-${code.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now().toString().slice(-4)}`;
+    const newCoupon = {
+      id,
+      code,
+      discountPercent: Math.min(100, Math.max(1, Number(couponData.discountPercent) || 10)),
+      minAmount: Math.max(0, Number(couponData.minAmount) || 0),
+      description: couponData.description || `${couponData.discountPercent}% OFF on orders above ₹${couponData.minAmount}`,
+      active: couponData.active !== undefined ? couponData.active : true,
+      usesCount: Number(couponData.usesCount) || 0,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    const existingIdx = this.coupons.findIndex(c => (c.code || '').toUpperCase() === code);
+    if (existingIdx >= 0) {
+      this.coupons[existingIdx] = { ...this.coupons[existingIdx], ...newCoupon };
+    } else {
+      this.coupons.unshift(newCoupon);
+    }
+
+    this._persist();
+    this._notify({ coupons: true, cart: true });
+
+    saveCouponToDb(newCoupon).catch(e => console.warn('Firestore coupon write:', e));
+    return { success: true, coupon: newCoupon };
+  }
+
+  updateCoupon(couponId, updates) {
+    const idx = this.coupons.findIndex(c => c.id === couponId);
+    if (idx >= 0) {
+      this.coupons[idx] = { ...this.coupons[idx], ...updates };
+      if (this.appliedCoupon && this.appliedCoupon.id === couponId) {
+        if (updates.active === false) {
+          this.appliedCoupon = null;
+          this.discountPercent = 0;
+        } else {
+          this.appliedCoupon = { ...this.appliedCoupon, ...updates };
+          this.discountPercent = this.appliedCoupon.discountPercent || 0;
+        }
+      }
+      this._persist();
+      this._notify({ coupons: true, cart: true });
+      updateCouponInDb(couponId, updates).catch(e => console.warn('Firestore coupon update:', e));
+      return true;
+    }
+    return false;
+  }
+
+  deleteCoupon(couponId) {
+    this.coupons = this.coupons.filter(c => c.id !== couponId);
+    if (this.appliedCoupon && this.appliedCoupon.id === couponId) {
+      this.appliedCoupon = null;
+      this.discountPercent = 0;
+      this.couponFeedback = null;
+    }
+    this._persist();
+    this._notify({ coupons: true, cart: true });
+    deleteCouponFromDb(couponId).catch(e => console.warn('Firestore coupon delete:', e));
+    return true;
+  }
+
+  applyCoupon(rawCode) {
+    const code = (rawCode || '').trim().toUpperCase();
+    if (!code) {
+      this.couponFeedback = { type: 'error', message: 'Please enter a coupon code.' };
+      this._notify({ cart: true });
+      return { success: false, message: 'Please enter a coupon code.' };
+    }
+
+    const coupon = (this.coupons || []).find(c => (c.code || '').toUpperCase() === code);
+    if (!coupon || coupon.active === false) {
+      this.couponFeedback = { type: 'error', message: `Coupon "${code}" is invalid or expired.` };
+      this._notify({ cart: true });
+      return { success: false, message: `Coupon "${code}" is invalid or expired.` };
+    }
+
+    const subtotal = this.getCartSubtotal();
+    const minRequired = Number(coupon.minAmount) || 0;
+
+    if (subtotal < minRequired) {
+      const shortfall = minRequired - subtotal;
+      this.couponFeedback = {
+        type: 'shortfall',
+        code: coupon.code,
+        shortfall,
+        minAmount: minRequired,
+        discountPercent: coupon.discountPercent,
+        message: `Add ₹${shortfall} more to apply ${coupon.code} (${coupon.discountPercent}% OFF · Min order ₹${minRequired})`
+      };
+      this._notify({ cart: true });
+      return {
+        success: false,
+        isShortfall: true,
+        shortfall,
+        minAmount: minRequired,
+        code: coupon.code,
+        message: this.couponFeedback.message
+      };
+    }
+
+    // Success: Apply coupon
+    this.appliedCoupon = coupon;
+    this.discountPercent = Number(coupon.discountPercent) || 0;
+    const discountAmount = Math.round((subtotal * this.discountPercent) / 100);
+    this.couponFeedback = {
+      type: 'success',
+      code: coupon.code,
+      discountPercent: coupon.discountPercent,
+      discountAmount,
+      message: `🎉 Coupon ${coupon.code} applied! You save ₹${discountAmount} (${coupon.discountPercent}% OFF)`
+    };
+
+    this._persist();
+    this._notify({ cart: true, checkout: true });
+    return { success: true, coupon, discountAmount, message: this.couponFeedback.message };
+  }
+
+  removeCoupon() {
+    this.appliedCoupon = null;
+    this.discountPercent = 0;
+    this.couponFeedback = null;
+    this._persist();
+    this._notify({ cart: true, checkout: true });
   }
 
   getCartCount() {
@@ -495,115 +883,180 @@ class AppState {
     this._notify({ cart: true });
   }
 
-  setCartOpen(open) {
-    this.toggleCart(open);
-  }
-
   toggleAuthModal(open) {
     this.isAuthOpen = open !== undefined ? open : !this.isAuthOpen;
     this._notify({ auth: true });
   }
 
-  toggleCheckout(open) {
+  toggleCheckoutModal(open) {
     this.isCheckoutOpen = open !== undefined ? open : !this.isCheckoutOpen;
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = this.isCheckoutOpen ? 'hidden' : '';
+    }
     this._notify({ checkout: true });
   }
 
-  setQuickView(product) {
+  openPolicyModal(policyType) {
+    this.policyModalType = policyType;
+    this._notify({ policy: true });
+  }
+
+  closePolicyModal() {
+    this.policyModalType = null;
+    this._notify({ policy: true });
+  }
+
+  setQuickViewProduct(product) {
     this.quickViewProduct = product;
     this._notify({ quickview: true });
   }
 
-  // ---- User Auth & Access Control ----
-  login(email, name, password) {
-    if ((email === 'admin@aurite.com' || email === 'admin') && (password === 'admin123' || !password)) {
-      this.isAdmin = true;
-      this.user = { email: 'admin@aurite.com', name: 'Admin Administrator', membership: 'Executive Admin', memberSince: '2026' };
-      this.isAuthOpen = false;
-      this._notify({ auth: true, admin: true, navbar: true });
-      return { success: true, isAdmin: true };
-    }
-
-    // Check if account is suspended / blocked by Admin
-    const existingAccount = (this.users || []).find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (existingAccount && existingAccount.isBlocked) {
-      return { success: false, blocked: true, message: 'Your account has been suspended by administration. Please contact support.' };
-    }
-
-    this.isAdmin = false;
-    this.user = {
-      email,
-      name: (existingAccount && existingAccount.name) ? existingAccount.name : (name || 'Alex Mercer'),
-      phone: (existingAccount && existingAccount.phone) ? existingAccount.phone : '+91 98765 43210',
-      address: (existingAccount && existingAccount.address) ? existingAccount.address : '742 Evergreen Terrace, Mumbai',
-      membership: 'Aurite Member',
-      memberSince: '2026'
+  checkout(customerDetails) {
+    if (this.cart.length === 0) return null;
+    const now = new Date();
+    const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    const discountAmount = this.getCartDiscount();
+    const newOrder = {
+      id: `VAL-${Math.floor(1000 + Math.random() * 9000)}-2026`,
+      userId: this.user?.uid || null,
+      customerName: customerDetails.customerName,
+      email: customerDetails.email,
+      phone: customerDetails.phone,
+      address: customerDetails.address,
+      date: formattedDate,
+      status: "Confirmed",
+      paymentMethod: customerDetails.paymentMethod || 'Razorpay Online',
+      paidAmount: customerDetails.paidAmount !== undefined ? customerDetails.paidAmount : this.getCartTotal(),
+      codAmount: customerDetails.codAmount !== undefined ? customerDetails.codAmount : 0,
+      razorpayPaymentId: customerDetails.razorpayPaymentId || null,
+      items: [...this.cart],
+      couponCode: this.appliedCoupon?.code || null,
+      discountAmount,
+      shipping: this.getCartShipping(),
+      total: this.getCartTotal()
     };
 
-    // If new user, add to directory
-    if (!existingAccount) {
-      if (!this.users) this.users = [];
-      this.users.unshift({
-        id: `USR-${Math.floor(100 + Math.random() * 900)}`,
-        name: this.user.name,
-        email: this.user.email,
-        phone: this.user.phone,
-        address: this.user.address,
-        joinedDate: new Date().toISOString().substring(0, 10),
-        isBlocked: false,
-        ordersCount: 0,
-        totalSpent: 0
+    // Increment coupon uses count if used
+    if (this.appliedCoupon && this.appliedCoupon.id) {
+      this.updateCoupon(this.appliedCoupon.id, {
+        usesCount: (this.appliedCoupon.usesCount || 0) + 1
       });
     }
 
-    this.isAuthOpen = false;
-    this._notify({ auth: true, navbar: true, users: true });
-    return { success: true, isAdmin: false };
+    this.orders.unshift(newOrder);
+    this.clearCart();
+    this.removeCoupon();
+    this.isCheckoutOpen = false;
+    this._notify({ orders: true, cart: true });
+
+    // Persist order to Cloud Firestore
+    createOrder(newOrder).then(firestoreId => {
+      if (firestoreId) {
+        newOrder.firestoreId = firestoreId;
+        this._persist();
+      }
+    }).catch(err => {
+      console.warn('Firestore order write error:', err);
+    });
+
+    return newOrder;
+  }
+
+  updateOrderStatus(orderId, newStatus, trackingId = '') {
+    const ord = (this.orders || []).find(o => o.id === orderId || o.firestoreId === orderId);
+    if (ord) {
+      ord.status = newStatus;
+      if (trackingId) ord.trackingId = trackingId;
+      this._persist();
+      this._notify({ orders: true });
+    }
+    // Update live in Cloud Firestore
+    updateOrderStatusInDb(orderId, newStatus, trackingId).catch(err => {
+      console.warn('Firestore update order status error:', err);
+    });
   }
 
   register(name, email, phone, password) {
-    const existingAccount = (this.users || []).find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (existingAccount && existingAccount.isBlocked) {
-      return { success: false, blocked: true, message: 'This email account is suspended. Please contact support.' };
-    }
-
     const newUser = {
-      id: `USR-${Math.floor(100 + Math.random() * 900)}`,
-      name: name || 'Alex Mercer',
-      email,
-      phone: phone || '+91 98765 43210',
-      address: '742 Evergreen Terrace, Mumbai, 400001',
-      joinedDate: new Date().toISOString().substring(0, 10),
-      isBlocked: false,
-      ordersCount: 0,
-      totalSpent: 0
+      name: name || 'Valued Member',
+      email: email,
+      phone: phone || '',
+      address: '',
+      city: '',
+      pincode: '',
+      country: 'India',
+      membership: 'Valeora Atelier Patron',
+      memberSince: new Date().getFullYear().toString()
     };
 
-    if (!this.users) this.users = [];
-    if (!existingAccount) this.users.unshift(newUser);
+    // Save to user store
+    const registered = JSON.parse(localStorage.getItem('valeora_registered_users') || '[]');
+    const existingIndex = registered.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+    if (existingIndex > -1) {
+      registered[existingIndex] = { ...registered[existingIndex], ...newUser, password };
+    } else {
+      registered.push({ ...newUser, password });
+    }
+    localStorage.setItem('valeora_registered_users', JSON.stringify(registered));
 
-    this.user = {
-      name: newUser.name,
-      email: newUser.email,
-      phone: newUser.phone,
-      address: newUser.address,
-      membership: 'Aurite Member',
-      memberSince: '2026'
-    };
-
-    this.isAdmin = false;
+    this.user = newUser;
     this.isAuthOpen = false;
-    this._notify({ auth: true, navbar: true, users: true });
-    return { success: true };
+    this._persist();
+    this._notify({ auth: true, navbar: true, user: true });
+    return { success: true, user: newUser };
   }
 
-  logout() {
+  login(email, password, fallbackName = null) {
+    const cleanEmail = (email || '').toLowerCase();
+    const isAdminUser = isAdminEmail(cleanEmail);
+    this.isAdmin = isAdminUser;
+
+    const registered = JSON.parse(localStorage.getItem('valeora_registered_users') || '[]');
+    const found = registered.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+
+    const displayName = isAdminUser ? 'Valeora Administrator' : (found?.name || fallbackName || (email ? email.split('@')[0] : 'Valued Patron'));
+
+    this.user = {
+      name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
+      email: email || 'patron@valeora.com',
+      phone: found?.phone || '',
+      address: found?.address || '',
+      city: found?.city || '',
+      pincode: found?.pincode || '',
+      country: found?.country || 'India',
+      membership: isAdminUser ? 'Administrator' : 'Valeora Atelier Patron',
+      memberSince: found?.memberSince || new Date().getFullYear().toString()
+    };
+
+    this.isAuthOpen = false;
+    this._persist();
+    this._notify({ auth: true, navbar: true, user: true });
+    return { success: true, user: this.user, isAdmin: this.isAdmin };
+  }
+
+  forgotPassword(email) {
+    return { success: true, message: `Password reset instructions have been sent to ${email}` };
+  }
+
+  async logout() {
+    try {
+      await logoutUser();
+    } catch (e) {
+      console.warn('Firebase logout error:', e);
+    }
     this.user = null;
     this.isAdmin = false;
-    localStorage.removeItem('aurite_user');
-    localStorage.removeItem('aurite_is_admin');
+    if (this._unsubscribeOrders) { this._unsubscribeOrders(); this._unsubscribeOrders = null; }
+    if (this._unsubscribeQueries) { this._unsubscribeQueries(); this._unsubscribeQueries = null; }
+    localStorage.removeItem('valeora_user');
+    localStorage.removeItem('valeora_is_admin');
+
+    // Switch to clean guest cart and route to home
+    const guestCart = localStorage.getItem('valeora_cart_guest');
+    this.cart = guestCart ? JSON.parse(guestCart) : [];
+    this.setRoute('home');
     this._persist();
-    this._notify({ auth: true, navbar: true, user: true, route: true });
+    this._notify({ auth: true, navbar: true, user: true, route: true, cart: true });
   }
 }
 

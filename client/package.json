@@ -1,5 +1,5 @@
 {
-  "name": "aurite-ecommerce",
+  "name": "valeora-client",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -10,5 +10,11 @@
   },
   "devDependencies": {
     "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "firebase": "^12.19.0",
+    "gsap": "^3.15.0",
+    "ogl": "^1.0.11",
+    "three": "^0.185.1"
   }
 }

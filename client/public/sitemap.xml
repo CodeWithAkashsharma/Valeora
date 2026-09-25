@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <!-- Homepage -->
+  <url>
+    <loc>https://valeora.in/</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://valeora.in/images/hero_necklace.jpg</image:loc>
+      <image:title>VALEORA Luxury Jewelry Collection</image:title>
+      <image:caption>Everyday fashion jewelry with 18K gold polish and anti-tarnish guarantee</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://valeora.in/images/valeora_logo.png</image:loc>
+      <image:title>VALEORA Brand Logo</image:title>
+    </image:image>
+  </url>
+
+  <!-- Shop / Jewelry Catalog Page -->
+  <url>
+    <loc>https://valeora.in/#shop</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://valeora.in/images/imperial_necklace.jpg</image:loc>
+      <image:title>Royal Ruby and Crystal Choker Necklace</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://valeora.in/images/featured_necklace.jpg</image:loc>
+      <image:title>Heritage Floral Ruby and Crystal Collar</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://valeora.in/images/hero_necklace.jpg</image:loc>
+      <image:title>Grand Victorian Emerald and CZ Choker</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://valeora.in/images/for_her.jpg</image:loc>
+      <image:title>For Her Fine Jewelry Collection</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://valeora.in/images/for_him.jpg</image:loc>
+      <image:title>For Him Men Chain and Bracelet Collection</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://valeora.in/images/for_him_hero.jpg</image:loc>
+      <image:title>Men Classic Cuban Curb Link Chain</image:title>
+    </image:image>
+  </url>
+
+  <!-- About Us / Craftsmanship Page -->
+  <url>
+    <loc>https://valeora.in/#about</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Jewelry Science & Quality Assurance -->
+  <url>
+    <loc>https://valeora.in/#science</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Contact Us / Customer Support -->
+  <url>
+    <loc>https://valeora.in/#contact</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Account & Order Tracking -->
+  <url>
+    <loc>https://valeora.in/#profile</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+</urlset>

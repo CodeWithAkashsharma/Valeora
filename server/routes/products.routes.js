@@ -2,53 +2,8 @@ import express from 'express';
 
 const router = express.Router();
 
-let products = [
-  {
-    id: 'prod-magnesium',
-    name: 'Aurite High-Absorption Magnesium Glycinate Complex',
-    category: 'Vitality & Brain',
-    price: 1899,
-    rating: 4.9,
-    reviewCount: 412,
-    stock: 145,
-    highlights: [
-      'Chelated Magnesium Bisglycinate for 99.4% gentle absorption',
-      'Infused with Vitamin B6 (P-5-P) for neurotransmitter synthesis',
-      'Zero laxative distress; promotes deep, restorative REM sleep',
-      'Third-party HPLC tested for heavy metal purity & potency'
-    ]
-  },
-  {
-    id: 'prod-omega3',
-    name: 'Aurite Ultra-Pure Triple-Strength Omega-3 Triglycerides',
-    category: 'Heart & Longevity',
-    price: 2499,
-    rating: 4.85,
-    reviewCount: 388,
-    stock: 82,
-    highlights: [
-      '1,200mg Total Omega-3s with 800mg EPA & 400mg DHA',
-      'Molecularly distilled wild-caught deep-sea Norwegian fish oil',
-      'Enteric-coated with organic sweet orange oil to prevent fishy burps',
-      'Certified IFOS 5-Star for low oxidation (TOTOX < 5)'
-    ]
-  },
-  {
-    id: 'prod-greens',
-    name: 'Aurite Daily Phyto-Nutrient Super Greens & Probiotics',
-    category: 'Digestion & Gut',
-    price: 2199,
-    rating: 4.8,
-    reviewCount: 295,
-    stock: 210,
-    highlights: [
-      '38 Certified Organic raw superfoods, alkalizing greens & adaptogens',
-      '10 Billion CFU multi-strain spore probiotics with prebiotic inulin',
-      'Comprehensive digestive enzyme matrix (Bromelain, Papain, Amylase)',
-      'Subtle natural green apple & organic peppermint leaf taste'
-    ]
-  }
-];
+// In-memory products store for development
+let products = [];
 
 // GET /api/products
 router.get('/', (req, res) => {

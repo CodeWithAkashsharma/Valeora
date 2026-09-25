@@ -1,70 +1,63 @@
 export function renderSciencePage() {
   return `
-    <div class="container section-padding">
-      <div style="text-align:center; max-width:720px; margin:0 auto 60px auto;">
-        <span class="badge badge-forest" style="margin-bottom:12px;">Molecular Innovation</span>
-        <h1 style="font-family:var(--font-serif); font-size:3rem; color:var(--color-forest-dark); margin-bottom:16px;">
-          The Science of Bio-Availability
-        </h1>
-        <p style="color:var(--color-text-muted); font-size:1.1rem; line-height:1.7;">
-          Why standard supplements fail, and how Aurite's patent-pending delivery system guarantees cellular absorption.
-        </p>
-      </div>
-
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:40px; align-items:center; margin-bottom:80px;">
-        <div>
-          <span class="badge badge-gold" style="margin-bottom:12px;">Enteric Shield Tech</span>
-          <h2 style="font-family:var(--font-serif); font-size:2.2rem; color:var(--color-forest-dark); margin-bottom:16px;">
-            Acid-Resistant Micro-Encapsulation
-          </h2>
-          <p style="color:var(--color-text-muted); line-height:1.7; margin-bottom:20px;">
-            The human stomach secretes hydrochloric acid at a pH of 1.5 to 2.0. Standard gelatin capsules disintegrate within 15 minutes, exposing sensitive probiotics, enzymes, and delicate lipids to destruction.
-          </p>
-          <p style="color:var(--color-text-muted); line-height:1.7;">
-            Aurite utilizes a natural alginate-derived matrix that remains completely intact through stomach passage, dissolving smoothly only when exposed to the alkaline pH 7.4 environment of the lower GI tract.
+    <div class="satin-backdrop" style="min-height: calc(100vh - 72px); padding: 40px 0 80px 0;">
+      <div class="container">
+        <!-- Header -->
+        <div style="text-align:center; max-width:760px; margin:0 auto 50px auto;">
+          <span class="badge-pill badge-rose" style="margin-bottom:12px;">Bespoke Atelier</span>
+          <h1 style="font-family:var(--font-serif); font-size:3rem; color:#ffffff; margin-bottom:16px;">
+            Gemology & Bespoke Artistry
+          </h1>
+          <p style="color:var(--color-text-secondary); font-size:1.1rem; line-height:1.7;">
+            From rare stone procurement to bespoke bridal commissions, explore how our gemologists and master jewelers bring singular visions to life.
           </p>
         </div>
 
-        <div>
-          <img src="/images/science_capsule.jpg" alt="Science Bio Capsule" style="width:100%; border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); border:1px solid var(--color-gold);">
+        <!-- Spotlight Showcase -->
+        <div class="spotlight-card-main" style="margin-bottom: 40px; padding: 36px;">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; align-items:center;">
+            <div>
+              <span class="badge-pill badge-ruby" style="margin-bottom:12px;">The Valeora 4Cs+ Standard</span>
+              <h2 style="font-family:var(--font-serif); font-size:2.2rem; color:#ffffff; margin-bottom:14px;">Triple Excellent Diamond Fire</h2>
+              <p style="color:var(--color-text-secondary); line-height:1.7; margin-bottom:20px;">
+                We accept fewer than 0.5% of the world's diamonds. Each stone must demonstrate Triple Excellent cut symmetry, D-F colorless grades, and VVS clarity under 40x binocular microscopy.
+              </p>
+              <a href="#contact" class="btn btn-pill btn-pill-lg" data-route="contact">
+                Commission Bespoke Creation
+              </a>
+            </div>
+            <div style="border-radius:var(--radius-lg); overflow:hidden; background:#180309;">
+              <img src="/images/category_diamond.jpg" alt="Diamond Gemology">
+            </div>
+          </div>
         </div>
-      </div>
 
-      <!-- Comparison Table -->
-      <div style="background:var(--color-white); border:1px solid var(--color-sand-border); border-radius:var(--radius-lg); padding:40px; box-shadow:var(--shadow-md);">
-        <h3 style="font-family:var(--font-serif); text-align:center; font-size:2rem; margin-bottom:32px;">Clinical Standards Comparison</h3>
-        
-        <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.95rem;">
-          <thead>
-            <tr style="border-bottom:2px solid var(--color-forest-dark);">
-              <th style="padding:16px;">Quality Metric</th>
-              <th style="padding:16px; color:var(--color-forest); font-weight:700;">Aurite Standards</th>
-              <th style="padding:16px; color:var(--color-text-light);">Generic Store Brands</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style="border-bottom:1px solid var(--color-sand-border);">
-              <td style="padding:16px; font-weight:600;">Stomach Acid Survival</td>
-              <td style="padding:16px; color:var(--color-forest); font-weight:700;">✓ 99.4% Survival Guaranteed</td>
-              <td style="padding:16px; color:var(--color-error);">✗ < 16% Active Compound Survival</td>
-            </tr>
-            <tr style="border-bottom:1px solid var(--color-sand-border);">
-              <td style="padding:16px; font-weight:600;">Heavy Metal Screening</td>
-              <td style="padding:16px; color:var(--color-forest); font-weight:700;">✓ Quadruple ICP-MS Tested</td>
-              <td style="padding:16px; color:var(--color-text-light);">Basic Batch Testing</td>
-            </tr>
-            <tr style="border-bottom:1px solid var(--color-sand-border);">
-              <td style="padding:16px; font-weight:600;">Fish Oil Oxidation (TOTOX)</td>
-              <td style="padding:16px; color:var(--color-forest); font-weight:700;">✓ Ultra-fresh TOTOX < 5</td>
-              <td style="padding:16px; color:var(--color-error);">TOTOX > 26 (Rancid Smell)</td>
-            </tr>
-            <tr>
-              <td style="padding:16px; font-weight:600;">Synthetic Binders / Fillers</td>
-              <td style="padding:16px; color:var(--color-forest); font-weight:700;">✓ Zero Artificial Fillers</td>
-              <td style="padding:16px; color:var(--color-text-light);">Magnesium Stearate & Silicon Dioxide</td>
-            </tr>
-          </tbody>
-        </table>
+        <!-- 4 Step Bespoke Commission Lifecycle -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
+          <div class="trust-pillar-card">
+            <div style="font-family:var(--font-sans); font-weight:800; font-size:1.8rem; color:var(--color-rose-pill); margin-bottom:8px;">01</div>
+            <h4 class="trust-pillar-title">Private Consultation</h4>
+            <p class="trust-pillar-desc">Meet with our head gemologist to select rare stones, design motifs, and precious metals.</p>
+          </div>
+
+          <div class="trust-pillar-card">
+            <div style="font-family:var(--font-sans); font-weight:800; font-size:1.8rem; color:var(--color-rose-pill); margin-bottom:8px;">02</div>
+            <h4 class="trust-pillar-title">Gouache & 3D Render</h4>
+            <p class="trust-pillar-desc">Custom watercolor sketches and sub-millimeter 3D wax molds sculpted for your approval.</p>
+          </div>
+
+          <div class="trust-pillar-card">
+            <div style="font-family:var(--font-sans); font-weight:800; font-size:1.8rem; color:var(--color-rose-pill); margin-bottom:8px;">03</div>
+            <h4 class="trust-pillar-title">Atelier Forging</h4>
+            <p class="trust-pillar-desc">180+ hours of hand setting, milgrain contouring, and mirror-grade polish by master craftsmen.</p>
+          </div>
+
+          <div class="trust-pillar-card">
+            <div style="font-family:var(--font-sans); font-weight:800; font-size:1.8rem; color:var(--color-rose-pill); margin-bottom:8px;">04</div>
+            <h4 class="trust-pillar-title">Armored Handover</h4>
+            <p class="trust-pillar-desc">Delivered in an engraved cedar-lined velvet chest with full GIA/IGI certification archives.</p>
+          </div>
+        </div>
       </div>
     </div>
   `;

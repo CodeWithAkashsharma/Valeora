@@ -2,11 +2,8 @@ import express from 'express';
 
 const router = express.Router();
 
-// Mock in-memory user store for demo/manual development
-let users = [
-  { id: 'usr-1', name: 'Akash Sharma', email: 'akash@example.com', phone: '+91 98765 43210', address: 'B-402, Green Glen Layout, Bellandur, Bengaluru 560103', role: 'user', isBlocked: false },
-  { id: 'usr-2', name: 'Dr. Priya Sharma', email: 'priya.s@techcorp.io', phone: '+91 98111 22334', address: '12-A, Cyber Hills, Gachibowli, Hyderabad 500032', role: 'user', isBlocked: false }
-];
+// In-memory user store for development
+let users = [];
 
 // POST /api/auth/login
 router.post('/login', (req, res) => {
@@ -15,11 +12,14 @@ router.post('/login', (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  // Admin check
-  if (email === 'admin@aurite.com' && password === 'admin123') {
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@valeora.com').toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || 'valeora_admin_secret';
+
+  // Admin authentication check
+  if (email.toLowerCase() === adminEmail && password === adminPassword) {
     return res.json({
-      user: { id: 'admin-1', name: 'Aurite Administrator', email: 'admin@aurite.com', role: 'admin' },
-      token: 'mock-jwt-admin-token'
+      user: { id: 'admin-1', name: 'Valeora Administrator', email: adminEmail, role: 'admin' },
+      token: process.env.JWT_SECRET ? `jwt-token-admin-${Date.now()}` : 'mock-jwt-admin-token'
     });
   }
 

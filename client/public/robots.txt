@@ -1,0 +1,8 @@
+# Robots.txt for VALEORA Jewelry (https://valeora.in)
+User-agent: *
+Allow: /
+Disallow: /admin
+
+# Search Engine Sitemaps
+Sitemap: https://valeora.in/sitemap.xml
+

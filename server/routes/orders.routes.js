@@ -2,22 +2,8 @@ import express from 'express';
 
 const router = express.Router();
 
-let orders = [
-  {
-    id: 'AUR-5815-2026',
-    date: '2026-08-08 09:36',
-    customerName: 'Akash Sharma',
-    email: 'akash@example.com',
-    items: [{ id: 'prod-magnesium', name: 'Aurite High-Absorption Magnesium Glycinate Complex', qty: 1, price: 1899, purchaseType: 'one-time' }],
-    subtotal: 1899,
-    discount: 0,
-    shipping: 0,
-    total: 1899,
-    status: 'Processing',
-    address: 'B-402, Green Glen Layout, Bellandur, Bengaluru 560103',
-    phone: '+91 98765 43210'
-  }
-];
+// In-memory orders store for development
+let orders = [];
 
 // GET /api/orders
 router.get('/', (req, res) => {

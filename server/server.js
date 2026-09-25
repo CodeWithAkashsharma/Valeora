@@ -26,9 +26,9 @@ app.use('/api/returns', returnsRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Aurite Backend Server', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', service: 'Valeora Backend Server', timestamp: new Date().toISOString() });
 });
 
 app.listen(PORT, () => {
-  console.log(`Aurite Backend Server running on http://localhost:${PORT}`);
+  console.log(`Valeora Backend Server running on http://localhost:${PORT}`);
 });

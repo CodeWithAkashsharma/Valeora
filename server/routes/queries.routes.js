@@ -2,21 +2,8 @@ import express from 'express';
 
 const router = express.Router();
 
-let queries = [
-  {
-    id: 'QRY-901',
-    customerName: 'Akash Sharma',
-    email: 'akash@example.com',
-    phone: '+91 98765 43210',
-    subject: 'Return Request for #AUR-5815-2026: Damaged Outer Packaging / Broken Seal',
-    message: 'Hello Aurite Support team,\n\nI received my order #AUR-5815-2026 today, but the outer packaging seal was crushed and tampered during transit. I am submitting this query to request a hassle-free return or replacement. Please review and arrange courier pickup.\n\nThank you,\nAkash Sharma',
-    status: 'Answered',
-    date: '2026-08-08 09:36',
-    replies: [
-      { sender: 'Admin', text: 'Hello Akash, we sincerely apologize for the transit mishandling. Please upload an image or confirm your availability for courier reverse pickup.', time: '2026-08-08 09:42' }
-    ]
-  }
-];
+// In-memory queries store for development
+let queries = [];
 
 // GET /api/queries
 router.get('/', (req, res) => {

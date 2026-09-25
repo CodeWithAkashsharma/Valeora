@@ -1,124 +1,269 @@
 import { state } from '../state.js';
 
-let isMobileMenuOpen = false;
-
 export function renderNavbar() {
   const cartCount = state.cart.reduce((sum, item) => sum + item.qty, 0);
   const user = state.user;
+  const currentRoute = state.currentRoute || 'home';
+  const isMenuOpen = Boolean(state.isMobileMenuOpen);
 
   return `
-    <header class="navbar">
+    <!-- Top Luxury Header -->
+    <header class="valeora-navbar ${currentRoute !== 'home' ? 'scrolled' : ''}">
       <div class="container navbar-container">
-        <!-- Brand Logo -->
-        <a href="#home" class="nav-brand" data-route="home">
-          <svg class="brand-logo-svg" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="46" fill="none" stroke="#c5a059" stroke-width="2.5"/>
-            <path d="M50 22 L72 58 L28 58 Z" fill="none" stroke="#143325" stroke-width="3"/>
-            <path d="M50 34 L62 58 L38 58 Z" fill="none" stroke="#c5a059" stroke-width="2"/>
-            <path d="M50 58 Q30 75 50 82 Q70 75 50 58 Z" fill="#143325"/>
-          </svg>
-          <span class="brand-name">Aurite</span>
+        <!-- Official Brand Logo & Name (Aligned Top-Left on Mobile) -->
+        <a href="#home" class="nav-brand-link" data-route="home" aria-label="VALEORA Home">
+          <img src="/images/valeora_logo.png" alt="VALEORA" class="nav-brand-logo-img">
+          <div class="nav-brand-text-block">
+            <span class="nav-brand-text">VALEORA</span>
+            <span class="nav-brand-subtext">ANTI-TARNISH JEWELLERY</span>
+          </div>
         </a>
 
-        <!-- Desktop Navigation Links -->
-        <ul class="nav-links">
-          <li><a href="#home" class="nav-link ${state.currentRoute === 'home' ? 'active' : ''}" data-route="home">Home</a></li>
-          <li><a href="#shop" class="nav-link ${state.currentRoute === 'shop' ? 'active' : ''}" data-route="shop">Shop All</a></li>
-          <li><a href="#science" class="nav-link ${state.currentRoute === 'science' ? 'active' : ''}" data-route="science">Science & Quality</a></li>
-          <li><a href="#about" class="nav-link ${state.currentRoute === 'about' ? 'active' : ''}" data-route="about">About</a></li>
-          <li><a href="#contact" class="nav-link ${state.currentRoute === 'contact' ? 'active' : ''}" data-route="contact">Contact</a></li>
+        <!-- Desktop Navigation Links: Home, Jewellery, About Us, Contact -->
+        <ul class="nav-menu-links">
+          <li><a href="#home" class="nav-link-item ${currentRoute === 'home' ? 'active' : ''}" data-route="home">Home</a></li>
+          <li><a href="#shop" class="nav-link-item ${currentRoute === 'shop' ? 'active' : ''}" data-route="shop">Jewellery</a></li>
+          <li><a href="#about" class="nav-link-item ${currentRoute === 'about' ? 'active' : ''}" data-route="about">About Us</a></li>
+          <li><a href="#contact" class="nav-link-item ${currentRoute === 'contact' ? 'active' : ''}" data-route="contact">Contact</a></li>
+          ${state.isAdmin ? `<li><a href="#admin" class="nav-link-item ${currentRoute === 'admin' ? 'active' : ''}" data-route="admin" style="color:#FFFFFF; font-weight:700; background:rgba(138,21,56,0.45); padding:4px 12px; border-radius:99px; border:1px solid rgba(214,184,190,0.35);">Admin Panel</a></li>` : ''}
         </ul>
 
-        <!-- Action Buttons -->
-        <div class="nav-actions">
-          <!-- Auth User Button -->
-          <button class="icon-btn" id="nav-user-btn" title="${user ? 'Account Profile' : 'Sign In'}" data-action="user">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- Desktop Action Buttons (Account, Bag) -->
+        <div class="nav-action-buttons">
+          <button class="nav-icon-btn" id="nav-user-btn" title="${user ? 'My Account' : 'Sign In'}" data-action="user">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
           </button>
 
-          <!-- Cart Drawer Button -->
-          <button class="icon-btn" id="nav-cart-btn" title="Shopping Cart" data-action="cart">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <button class="nav-icon-btn" id="nav-cart-btn" title="Shopping Bag" data-action="cart">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <path d="M16 10a4 4 0 0 1-8 0"></path>
             </svg>
-            ${cartCount > 0 ? `<span class="cart-badge-count">${cartCount}</span>` : ''}
-          </button>
-
-          <!-- Mobile Hamburger Toggle -->
-          <button class="icon-btn mobile-toggle-btn" id="mobile-menu-toggle" aria-label="Toggle Navigation Menu">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              ${isMobileMenuOpen 
-                ? '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>' 
-                : '<line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>'}
-            </svg>
+            ${cartCount > 0 ? `<span class="nav-badge-count">${cartCount}</span>` : ''}
           </button>
         </div>
-      </div>
 
-      <!-- Mobile Dropdown Navigation Drawer -->
-      <div class="mobile-nav-drawer ${isMobileMenuOpen ? 'open' : ''}" id="mobile-nav-drawer">
-        <ul class="mobile-nav-links">
-          <li><a href="#home" class="mobile-nav-link ${state.currentRoute === 'home' ? 'active' : ''}" data-route="home">Home</a></li>
-          <li><a href="#shop" class="mobile-nav-link ${state.currentRoute === 'shop' ? 'active' : ''}" data-route="shop">Shop All</a></li>
-          <li><a href="#science" class="mobile-nav-link ${state.currentRoute === 'science' ? 'active' : ''}" data-route="science">Science & Quality</a></li>
-          <li><a href="#about" class="mobile-nav-link ${state.currentRoute === 'about' ? 'active' : ''}" data-route="about">About</a></li>
-          <li><a href="#contact" class="mobile-nav-link ${state.currentRoute === 'contact' ? 'active' : ''}" data-route="contact">Contact</a></li>
-          ${user ? `<li><a href="#profile" class="mobile-nav-link ${state.currentRoute === 'profile' ? 'active' : ''}" data-route="profile">My Account (${user.name})</a></li>` : ''}
-        </ul>
-        <div style="padding: 16px 24px; border-top: 1px solid var(--color-sand-border); display:flex; gap:12px;">
-          ${!user ? `<button class="btn btn-primary btn-sm" id="mobile-signin-btn" style="width:100%;">Sign In / Register</button>` : ''}
+        <!-- Mobile Controls: Pure Floating Bag & Luxury Menu (No Text, No Background) -->
+        <div class="nav-mobile-controls">
+          <button class="nav-floating-btn nav-mobile-cart-btn" id="nav-mobile-cart-btn" title="Shopping Bag" aria-label="Shopping Bag">
+            <svg class="lux-bag-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 8h14l1.2 13H3.8L5 8z"></path>
+              <path d="M8.5 8V5.5a3.5 3.5 0 0 1 7 0V8"></path>
+            </svg>
+            ${cartCount > 0 ? `<span class="nav-floating-badge">${cartCount}</span>` : ''}
+          </button>
+
+          <button class="nav-floating-btn nav-mobile-burger-btn ${isMenuOpen ? 'active' : ''}" id="mobile-burger-btn" aria-label="Navigation Menu" aria-expanded="${isMenuOpen}">
+            <div class="lux-haute-menu">
+              <span class="haute-bar haute-bar-1"></span>
+              <span class="haute-bar haute-bar-2"></span>
+              <span class="haute-bar haute-bar-3"></span>
+            </div>
+          </button>
         </div>
       </div>
     </header>
+
+    <!-- Mobile Slide-Out Navigation Drawer (Opens from Right) -->
+    <div class="mobile-drawer-overlay ${isMenuOpen ? 'open' : ''}" id="mobile-drawer-overlay">
+      <div class="mobile-drawer-container" id="mobile-drawer-container">
+        
+        <!-- Drawer Header -->
+        <div class="mobile-drawer-header">
+          <div class="mobile-drawer-brand">
+            <img src="/images/valeora_logo.png" alt="VALEORA" class="drawer-brand-logo">
+            <div class="drawer-brand-info">
+              <span class="drawer-brand-name">VALEORA</span>
+              <span class="drawer-brand-tag">ANTI-TARNISH JEWELLERY</span>
+            </div>
+          </div>
+          <button class="mobile-drawer-close-btn" id="mobile-drawer-close-btn" aria-label="Close menu">
+            <svg class="drawer-close-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Anti-Tarnish Feature Showcase Banner -->
+        <div class="mobile-drawer-at-banner">
+          <div class="drawer-at-seal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            <span>ANTI-TARNISH CERTIFIED</span>
+          </div>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="mobile-drawer-nav">
+          <ul class="mobile-drawer-links">
+            <li class="drawer-item" style="--item-index: 1;">
+              <a href="#home" class="mobile-drawer-link ${currentRoute === 'home' ? 'active' : ''}" data-route="home">
+                <svg class="drawer-link-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                </svg>
+                <span class="drawer-link-label">Home</span>
+                <span class="drawer-link-arrow">›</span>
+              </a>
+            </li>
+
+            <li class="drawer-item" style="--item-index: 2;">
+              <a href="#shop" class="mobile-drawer-link ${currentRoute === 'shop' ? 'active' : ''}" data-route="shop">
+                <svg class="drawer-link-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M6 3h12l4 6-10 13L2 9Z"></path>
+                  <path d="M11 3L8 9l4 13 4-13-3-6"></path>
+                  <path d="M2 9h20"></path>
+                </svg>
+                <div class="drawer-link-label-group">
+                  <span class="drawer-link-label">Jewellery</span>
+                  <span class="drawer-link-sublabel">Rings · Necklaces · Bracelets · Earrings</span>
+                </div>
+                <span class="drawer-link-arrow">›</span>
+              </a>
+            </li>
+
+            <li class="drawer-item" style="--item-index: 3;">
+              <a href="#about" class="mobile-drawer-link ${currentRoute === 'about' ? 'active' : ''}" data-route="about">
+                <svg class="drawer-link-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                <span class="drawer-link-label">About Us</span>
+                <span class="drawer-link-arrow">›</span>
+              </a>
+            </li>
+
+            <li class="drawer-item" style="--item-index: 4;">
+              <a href="#contact" class="mobile-drawer-link ${currentRoute === 'contact' ? 'active' : ''}" data-route="contact">
+                <svg class="drawer-link-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                </svg>
+                <span class="drawer-link-label">Contact</span>
+                <span class="drawer-link-arrow">›</span>
+              </a>
+            </li>
+
+            <li class="drawer-item" style="--item-index: 5;">
+              <a href="#profile" class="mobile-drawer-link ${currentRoute === 'profile' ? 'active' : ''}" id="drawer-profile-link" data-route="profile">
+                <svg class="drawer-link-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <div class="drawer-link-label-group">
+                  <span class="drawer-link-label">${user ? (user.name || 'My Profile') : 'Sign In / Account'}</span>
+                  <span class="drawer-link-sublabel">${user ? (user.email || 'Member') : 'Track orders & manage wishlist'}</span>
+                </div>
+                <span class="drawer-link-arrow">›</span>
+              </a>
+            </li>
+
+            ${state.isAdmin ? `
+            <li class="drawer-item" style="--item-index: 6;">
+              <a href="#admin" class="mobile-drawer-link drawer-admin-link ${currentRoute === 'admin' ? 'active' : ''}" id="drawer-admin-link" data-route="admin">
+                <svg class="drawer-link-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                <div class="drawer-link-label-group">
+                  <span class="drawer-link-label">Admin Control Panel</span>
+                  <span class="drawer-link-sublabel">Orders, products, inquiries & patrons</span>
+                </div>
+                <span class="drawer-link-arrow">›</span>
+              </a>
+            </li>
+            ` : ''}
+          </ul>
+        </nav>
+
+        <!-- Drawer Footer with Quick Cart Action -->
+        <div class="mobile-drawer-footer">
+          <button class="drawer-bag-quick-btn" id="drawer-bag-quick-btn" aria-label="Shopping Bag">
+            <div class="drawer-bag-quick-left">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 8h14l1.2 13H3.8L5 8z"></path>
+                <path d="M8.5 8V5.5a3.5 3.5 0 0 1 7 0V8"></path>
+              </svg>
+              <span>Shopping Bag</span>
+            </div>
+            <span class="drawer-bag-badge">${cartCount} ${cartCount === 1 ? 'item' : 'items'}</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
   `;
 }
 
 export function bindNavbarEvents() {
-  // Mobile Hamburger Toggle
-  const toggleBtn = document.getElementById('mobile-menu-toggle');
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => {
-      isMobileMenuOpen = !isMobileMenuOpen;
-      const drawer = document.getElementById('mobile-nav-drawer');
-      if (drawer) drawer.classList.toggle('open', isMobileMenuOpen);
-    });
-  }
-
-  // User Icon Button
   const userBtn = document.getElementById('nav-user-btn');
-  if (userBtn) {
-    userBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (state.user) {
-        state.setRoute('profile');
-      } else {
-        state.toggleAuthModal(true);
-      }
-      isMobileMenuOpen = false;
-    });
-  }
+  const drawerProfileLink = document.getElementById('drawer-profile-link');
 
-  // Mobile Signin Button
-  const mobileSignin = document.getElementById('mobile-signin-btn');
-  if (mobileSignin) {
-    mobileSignin.addEventListener('click', () => {
+  const handleUserClick = (e) => {
+    e.preventDefault();
+    state.toggleMobileMenu(false);
+    if (state.user) {
+      state.setRoute('profile');
+    } else {
       state.toggleAuthModal(true);
-      isMobileMenuOpen = false;
+    }
+  };
+
+  if (userBtn) userBtn.addEventListener('click', handleUserClick);
+  if (drawerProfileLink && !state.user) {
+    drawerProfileLink.addEventListener('click', handleUserClick);
+  }
+
+  const cartBtn = document.getElementById('nav-cart-btn');
+  const mobileCartBtn = document.getElementById('nav-mobile-cart-btn');
+  const drawerBagBtn = document.getElementById('drawer-bag-quick-btn');
+
+  const handleCartClick = (e) => {
+    e.preventDefault();
+    state.toggleMobileMenu(false);
+    state.toggleCart(true);
+  };
+
+  if (cartBtn) cartBtn.addEventListener('click', handleCartClick);
+  if (mobileCartBtn) mobileCartBtn.addEventListener('click', handleCartClick);
+  if (drawerBagBtn) drawerBagBtn.addEventListener('click', handleCartClick);
+
+  // Mobile Burger Menu Toggle
+  const burgerBtn = document.getElementById('mobile-burger-btn');
+  const closeBtn = document.getElementById('mobile-drawer-close-btn');
+  const overlay = document.getElementById('mobile-drawer-overlay');
+  const drawerContainer = document.getElementById('mobile-drawer-container');
+
+  if (burgerBtn) {
+    burgerBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      state.toggleMobileMenu();
     });
   }
 
-  // Cart Button
-  const cartBtn = document.getElementById('nav-cart-btn');
-  if (cartBtn) {
-    cartBtn.addEventListener('click', (e) => {
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      state.toggleCart(true);
-      isMobileMenuOpen = false;
+      state.toggleMobileMenu(false);
     });
   }
+
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (drawerContainer && !drawerContainer.contains(e.target)) {
+        state.toggleMobileMenu(false);
+      }
+    });
+  }
+
+  // Close drawer on clicking any navigation link inside drawer
+  const drawerLinks = document.querySelectorAll('.mobile-drawer-link');
+  drawerLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      state.toggleMobileMenu(false);
+    });
+  });
 }

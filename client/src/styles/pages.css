@@ -362,23 +362,33 @@
    RESPONSIVE BREAKPOINTS (300px to 900px)
    ========================================================================== */
 
-@media (max-width: 900px) {
-  .hero-grid, .science-banner, .profile-grid {
-    grid-template-columns: 1fr;
+@media (min-width: 601px) and (max-width: 1100px) {
+  .hero-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  
+  .science-banner {
+    grid-template-columns: 1fr 1fr;
   }
   
   .hero-visual-wrap {
-    height: 360px;
+    height: 400px;
   }
 
   .metrics-row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr);
     margin-top: 20px;
     padding: 24px;
   }
 
   .science-content {
-    padding: 28px;
+    padding: 32px 28px;
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
   }
 }
 

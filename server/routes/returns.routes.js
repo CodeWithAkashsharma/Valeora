@@ -2,25 +2,8 @@ import express from 'express';
 
 const router = express.Router();
 
-let returns = [
-  {
-    id: 'RET-101',
-    orderId: 'AUR-5815-2026',
-    productId: 'prod-magnesium',
-    productName: 'Aurite High-Absorption Magnesium Glycinate Complex',
-    customerName: 'Akash Sharma',
-    email: 'akash@example.com',
-    phone: '+91 98765 43210',
-    reason: 'Damaged Outer Packaging / Broken Seal',
-    details: 'The parcel arrived with outer seal broken. Requesting full refund or sealed unit exchange.',
-    amount: 1899,
-    status: 'Requested',
-    date: '2026-08-08 09:36',
-    chat: [
-      { sender: 'Aurite Returns Bot', text: 'Return claim #RET-101 received. Please discuss details with our resolutions team below.', time: '2026-08-08 09:36' }
-    ]
-  }
-];
+// In-memory returns store for development
+let returns = [];
 
 // GET /api/returns
 router.get('/', (req, res) => {
