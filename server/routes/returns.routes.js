@@ -17,7 +17,7 @@ router.post('/', (req, res) => {
     date: new Date().toISOString().replace('T', ' ').substring(0, 16),
     status: 'Requested',
     chat: [
-      { sender: 'Aurite Returns Bot', text: 'Return claim logged. Our resolutions officer is reviewing your request.', time: new Date().toISOString().replace('T', ' ').substring(0, 16) }
+      { sender: 'Valeora Returns Bot', text: 'Return claim logged. Our resolutions officer is reviewing your request.', time: new Date().toISOString().replace('T', ' ').substring(0, 16) }
     ],
     ...req.body
   };
@@ -45,7 +45,7 @@ router.put('/:id/status', (req, res) => {
   ret.status = req.body.status;
   if (req.body.note) {
     ret.chat.push({
-      sender: 'Aurite Returns Bot',
+      sender: 'Valeora Returns Bot',
       text: `Status updated to: ${req.body.status}. ${req.body.note}`,
       time: new Date().toISOString().replace('T', ' ').substring(0, 16)
     });

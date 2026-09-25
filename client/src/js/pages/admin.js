@@ -436,9 +436,9 @@ export function renderAdminPage() {
   }
 
   return `
-    <div class="aurite-admin-standalone-root">
+    <div class="valeora-admin-standalone-root">
       <style>
-        .aurite-admin-standalone-root {
+        .valeora-admin-standalone-root {
           position: fixed;
           top: 0; left: 0; right: 0; bottom: 0;
           width: 100vw;
@@ -1128,7 +1128,7 @@ export function renderAdminPage() {
           position: relative;
         }
 
-        .aurite-admin-standalone-root,
+        .valeora-admin-standalone-root,
         .admin-modal-dialog {
           color-scheme: dark;
         }
@@ -1325,7 +1325,7 @@ export function renderAdminPage() {
 
         /* Admin Responsive Styles */
         @media (max-width: 900px) {
-          .aurite-admin-standalone-root {
+          .valeora-admin-standalone-root {
             flex-direction: column;
             overflow-y: auto;
           }

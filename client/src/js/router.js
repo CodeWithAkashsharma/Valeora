@@ -5,7 +5,6 @@ import { renderAboutPage, bindAboutPageEvents } from './pages/about.js';
 import { renderContactPage, bindContactPageEvents } from './pages/contact.js';
 import { renderProfilePage, bindProfilePageEvents } from './pages/profile.js';
 import { renderNotFoundPage, bindNotFoundPageEvents } from './pages/notFound.js';
-import { ScrollCanvasEngine } from './scrollAnimation.js';
 import { state } from './state.js';
 
 export function renderCurrentPage(route) {
@@ -51,9 +50,6 @@ export function renderCurrentPage(route) {
     case 'home':
       container.innerHTML = renderHomePage();
       bindHomePageEvents();
-      setTimeout(() => {
-        new ScrollCanvasEngine('scroll-canvas');
-      }, 50);
       break;
 
     default:

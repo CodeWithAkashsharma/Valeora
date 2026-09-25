@@ -14,6 +14,24 @@ export default defineConfig({
     cors: true
   },
   build: {
-    outDir: path.resolve(__dirname, 'dist')
+    outDir: path.resolve(__dirname, 'dist'),
+    minify: 'esbuild',
+    cssMinify: true,
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/three')) {
+            return 'vendor-three';
+          }
+          if (id.includes('node_modules/firebase')) {
+            return 'vendor-firebase';
+          }
+          if (id.includes('node_modules/gsap') || id.includes('node_modules/ogl')) {
+            return 'vendor-animations';
+          }
+        }
+      }
+    }
   }
 });

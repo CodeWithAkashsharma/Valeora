@@ -1,5 +1,5 @@
 /* ==========================================================================
-   AURITE LUXURY DESIGN SYSTEM - PAGES & RESPONSIVE UI/UX STYLES
+   VALEORA LUXURY DESIGN SYSTEM - PAGES & RESPONSIVE UI/UX STYLES
    ========================================================================== */
 
 /* Hero Section & Canvas Scroll Showcase */
@@ -77,70 +77,6 @@
   width: 20px;
   height: 20px;
   color: var(--color-gold);
-}
-
-/* Scroll Canvas Container */
-.hero-visual-wrap {
-  position: relative;
-  width: 100%;
-  height: 480px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.canvas-scroll-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: radial-gradient(circle at center, #1b4330 0%, #091811 100%);
-  box-shadow: var(--shadow-lg), var(--shadow-gold);
-  border: 1px solid rgba(197, 160, 89, 0.3);
-}
-
-#scroll-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.canvas-badge-tag {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  background: rgba(15, 40, 30, 0.85);
-  backdrop-filter: blur(8px);
-  padding: 6px 12px;
-  border-radius: var(--radius-full);
-  color: var(--color-gold-bright);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 1px solid rgba(197, 160, 89, 0.3);
-  z-index: 5;
-}
-
-.scroll-hint-overlay {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: var(--color-sand-light);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(15, 40, 30, 0.75);
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  z-index: 5;
-  white-space: nowrap;
 }
 
 /* Sections */
