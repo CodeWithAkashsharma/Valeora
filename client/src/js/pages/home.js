@@ -43,7 +43,7 @@ export function renderHomePage() {
 
           <!-- Descriptive Subtitle (Precise & Accurate) -->
           <p class="hero-left-desc">
-            Exquisite everyday fashion jewelry crafted with lasting color shine, premium gold polish, and skin-safe comfort.
+            Jewelry that tells your story—<br class="hero-desc-mobile-br">designed with lasting brilliance,<br class="hero-desc-mobile-br">gentle comfort, and accessible luxury.
           </p>
 
           <!-- CTA Buttons: Interactive Creepy Eye-Tracking Shop Button -->

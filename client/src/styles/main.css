@@ -475,6 +475,10 @@ img {
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
 }
 
+.hero-desc-mobile-br {
+  display: none;
+}
+
 /* Hero Action Button Group */
 .hero-btn-group {
   display: flex;
@@ -1893,39 +1897,44 @@ img {
   }
 
   .hero-left-box {
-    max-width: 72%;
+    max-width: 88%;
     /* Constrain width to prevent text from overflowing to the right jewelry visual */
     width: 100%;
   }
 
+  .hero-desc-mobile-br {
+    display: block;
+  }
+
   .hero-left-title {
     font-family: var(--font-serif);
-    font-size: clamp(1.75rem, 6.2vw, 2.35rem);
+    font-size: clamp(2.1rem, 7vw, 2.75rem);
     font-weight: 500;
     line-height: 1.16;
     color: #ffffff;
     margin-top: 0;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     letter-spacing: -0.01em;
     text-shadow: 0 4px 18px rgba(0, 0, 0, 0.85);
   }
 
   .hero-motto-text {
     font-family: var(--font-serif);
-    font-size: 0.98rem;
+    font-size: 1.18rem;
     font-style: italic;
     color: #ECCFD0;
-    margin-bottom: 9px;
+    margin-bottom: 12px;
     letter-spacing: 0.02em;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
   }
 
   .hero-left-desc {
-    font-size: 0.88rem;
-    line-height: 1.5;
-    color: rgba(245, 230, 232, 0.92);
-    margin-bottom: 18px;
+    font-size: 1.05rem;
+    line-height: 1.55;
+    color: rgba(245, 230, 232, 0.95);
+    margin-bottom: 22px;
     max-width: 100%;
+    text-wrap: balance;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
   }
 
@@ -2592,25 +2601,26 @@ img {
   }
 
   .hero-left-box {
-    max-width: 75%;
+    max-width: 90%;
   }
 
   .hero-left-title {
-    font-size: 1.65rem !important;
-    line-height: 1.16 !important;
-    margin-bottom: 7px !important;
+    font-size: 2.05rem !important;
+    line-height: 1.18 !important;
+    margin-bottom: 10px !important;
   }
 
   .hero-motto-text {
-    font-size: 0.92rem !important;
-    margin-bottom: 8px !important;
+    font-size: 1.15rem !important;
+    margin-bottom: 11px !important;
   }
 
   .hero-left-desc {
-    font-size: 0.84rem !important;
-    line-height: 1.48 !important;
-    margin-bottom: 16px !important;
+    font-size: 1.02rem !important;
+    line-height: 1.52 !important;
+    margin-bottom: 20px !important;
     max-width: 100% !important;
+    text-wrap: balance !important;
   }
 
   .creepy-btn__cover {
@@ -2912,7 +2922,7 @@ img {
   }
 
   .hero-left-box {
-    max-width: 80%;
+    max-width: 92%;
     padding: 8px 12px !important;
   }
 
@@ -2922,17 +2932,18 @@ img {
   }
 
   .hero-left-title {
-    font-size: 1.45rem !important;
-    line-height: 1.16 !important;
+    font-size: 1.90rem !important;
+    line-height: 1.18 !important;
   }
 
   .hero-motto-text {
-    font-size: 0.86rem !important;
+    font-size: 1.08rem !important;
   }
 
   .hero-left-desc {
-    font-size: 0.80rem !important;
-    line-height: 1.45 !important;
+    font-size: 0.98rem !important;
+    line-height: 1.50 !important;
+    text-wrap: balance !important;
   }
 
   .creepy-btn__cover {
@@ -3251,17 +3262,17 @@ img {
   }
 
   .hero-left-title {
-    font-size: 1.32rem !important;
-    line-height: 1.16 !important;
+    font-size: 1.80rem !important;
+    line-height: 1.18 !important;
   }
 
   .hero-motto-text {
-    font-size: 0.80rem !important;
+    font-size: 1.02rem !important;
   }
 
   .hero-left-desc {
-    font-size: 0.76rem !important;
-    line-height: 1.42 !important;
+    font-size: 0.98rem !important;
+    line-height: 1.5 !important;
   }
 
   .creepy-btn__cover {
@@ -4361,21 +4372,21 @@ img {
   }
 
   .hero-left-title {
-    font-size: clamp(1.85rem, 3.8vw, 2.5rem) !important;
-    line-height: 1.15 !important;
-    margin-bottom: 8px !important;
-  }
-
-  .hero-motto-text {
-    font-size: 0.96rem !important;
+    font-size: clamp(2.1rem, 5.5vw, 2.75rem) !important;
+    line-height: 1.16 !important;
     margin-bottom: 10px !important;
   }
 
+  .hero-motto-text {
+    font-size: 1.18rem !important;
+    margin-bottom: 12px !important;
+  }
+
   .hero-left-desc {
-    font-size: 0.84rem !important;
-    line-height: 1.5 !important;
-    margin-bottom: 20px !important;
-    max-width: 500px !important;
+    font-size: 1.10rem !important;
+    line-height: 1.58 !important;
+    margin-bottom: 22px !important;
+    max-width: 520px !important;
   }
 
   .hero-btn-group {
