@@ -323,6 +323,66 @@ export function renderHomePage() {
   `;
 }
 
+let circularGalleryInstance = null;
+
+export function updateCircularGallery() {
+  const stageEl = document.getElementById('circular-webgl-stage');
+  if (!stageEl) return;
+
+  if (circularGalleryInstance) {
+    try {
+      circularGalleryInstance.destroy();
+    } catch (e) {
+      console.warn('Error destroying circular gallery:', e);
+    }
+    circularGalleryInstance = null;
+  }
+  stageEl.innerHTML = '';
+
+  const isMobile = window.innerWidth <= 768;
+  const liveProducts = state.products || [];
+  const validProducts = liveProducts.filter(p => p && p.image);
+
+  if (validProducts.length > 0) {
+    // Build dynamic items from admin product catalog
+    let dynamicItems = validProducts.map(p => ({
+      id: p.id,
+      image: p.image,
+      text: p.name || 'Fine Jewelry'
+    }));
+
+    // Ensure minimum 6 planes for continuous 3D circular loop
+    let itemsToUse = dynamicItems;
+    while (itemsToUse.length < 6) {
+      itemsToUse = itemsToUse.concat(dynamicItems);
+    }
+
+    try {
+      circularGalleryInstance = new CircularGallery(stageEl, {
+        items: itemsToUse,
+        bend: isMobile ? 2.5 : 3.5,
+        textColor: '#ECCFD0',
+        borderRadius: 0.08,
+        scrollEase: 0.048,
+        scrollSpeed: 2.5,
+        autoSpeed: 0.038,
+        autoScroll: true,
+        font: '600 24px "Playfair Display", serif'
+      });
+    } catch (e) {
+      console.warn('Error creating CircularGallery:', e);
+    }
+  } else {
+    stageEl.innerHTML = `
+      <div style="height: 100%; min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #ECCFD0; padding: 40px 20px;">
+        <span style="font-size: 2.2rem; margin-bottom: 8px;">💎</span>
+        <h4 style="font-family: var(--font-serif); font-size: 1.3rem; color: #FFFFFF; margin: 0 0 6px 0;">3D Infinity Gallery</h4>
+        <p style="font-size: 0.85rem; opacity: 0.85; max-width: 380px; margin: 0; line-height: 1.4;">Products published via the Admin Panel will automatically appear here in 3D perspective.</p>
+      </div>
+    `;
+  }
+}
+
 export function bindHomePageEvents() {
   const gridEl = document.getElementById('home-featured-grid');
   if (gridEl) {
@@ -350,56 +410,26 @@ export function bindHomePageEvents() {
   // INITIALIZE WEBGL CIRCULAR GALLERY (OGL)
   // Dynamically uses real product images added by admin
   // ========================================================
-  const stageEl = document.getElementById('circular-webgl-stage');
-  if (stageEl) {
-    const isMobile = window.innerWidth <= 768;
-    const liveProducts = state.products || [];
-    const validProducts = liveProducts.filter(p => p && p.image);
-
-    if (validProducts.length > 0) {
-      // Build dynamic items from admin product catalog
-      let dynamicItems = validProducts.map(p => ({
-        id: p.id,
-        image: p.image,
-        text: p.name || 'Fine Jewelry'
-      }));
-
-      // Ensure minimum 6 planes for continuous 3D circular loop
-      let itemsToUse = dynamicItems;
-      while (itemsToUse.length < 6) {
-        itemsToUse = itemsToUse.concat(dynamicItems);
-      }
-
-      new CircularGallery(stageEl, {
-        items: itemsToUse,
-        bend: isMobile ? 2.5 : 3.5,
-        textColor: '#ECCFD0',
-        borderRadius: 0.08,
-        scrollEase: 0.048,
-        scrollSpeed: 2.5,
-        autoSpeed: 0.038,
-        autoScroll: true,
-        font: '600 24px "Playfair Display", serif'
-      });
-    } else {
-      stageEl.innerHTML = `
-        <div style="height: 100%; min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #ECCFD0; padding: 40px 20px;">
-          <span style="font-size: 2.2rem; margin-bottom: 8px;">💎</span>
-          <h4 style="font-family: var(--font-serif); font-size: 1.3rem; color: #FFFFFF; margin: 0 0 6px 0;">3D Infinity Gallery</h4>
-          <p style="font-size: 0.85rem; opacity: 0.85; max-width: 380px; margin: 0; line-height: 1.4;">Products published via the Admin Panel will automatically appear here in 3D perspective.</p>
-        </div>
-      `;
-    }
+  try {
+    updateCircularGallery();
+  } catch (err) {
+    console.warn('updateCircularGallery failed:', err);
   }
 
   // Initialize Jelly Squeeze physics on hero buttons
-  bindAllJellyButtons();
+  try {
+    bindAllJellyButtons();
+  } catch (err) {}
 
   // Initialize Creepy Eye-Tracking button
-  bindAllCreepyButtons();
+  try {
+    bindAllCreepyButtons();
+  } catch (err) {}
 
   // Initialize Interactive Stretchy Water Bubble
-  initInteractiveWaterBubble();
+  try {
+    initInteractiveWaterBubble();
+  } catch (err) {}
 }
 
 /**

@@ -3,6 +3,18 @@
 
 let _activeModalPromise = null;
 
+export function dismissConfirmModal() {
+  const existing = document.getElementById('valeora-confirm-modal-overlay');
+  if (existing) {
+    if (typeof _activeModalPromise === 'function') {
+      const resolveFn = _activeModalPromise;
+      _activeModalPromise = null;
+      resolveFn(false);
+    }
+    existing.remove();
+  }
+}
+
 export function showConfirmModal({
   title = 'Confirmation',
   message = 'Are you sure you want to proceed?',
@@ -11,13 +23,19 @@ export function showConfirmModal({
   danger = false
 } = {}) {
   return new Promise((resolve) => {
-    // Remove any existing confirm modal
-    const existing = document.getElementById('valeora-confirm-modal-overlay');
-    if (existing) existing.remove();
+    // Dismiss any existing confirm modal cleanly and resolve its promise
+    dismissConfirmModal();
+    _activeModalPromise = resolve;
 
     const overlay = document.createElement('div');
     overlay.id = 'valeora-confirm-modal-overlay';
     overlay.className = 'modal-overlay open confirm-modal-overlay';
+    overlay.style.zIndex = '9999999';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
 
     const iconSvg = danger ? `
       <div class="confirm-modal-icon danger">
@@ -55,6 +73,7 @@ export function showConfirmModal({
     document.body.appendChild(overlay);
 
     const cleanup = (result) => {
+      _activeModalPromise = null;
       document.removeEventListener('keydown', keyHandler);
       overlay.classList.remove('open');
       overlay.style.opacity = '0';

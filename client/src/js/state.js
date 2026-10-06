@@ -14,45 +14,17 @@ import {
   saveProductToDb,
   deleteProductFromDb,
   seedProductsIfEmpty,
+  fetchProductsFromDb,
   subscribeToCoupons,
   saveCouponToDb,
   updateCouponInDb,
   deleteCouponFromDb,
-  seedCouponsIfEmpty
+  subscribeToUsers
 } from './services/firebase.js';
 
-export const DEFAULT_COUPONS = [
-  {
-    id: 'coupon-valeora10',
-    code: 'VALEORA10',
-    discountPercent: 10,
-    minAmount: 499,
-    description: '10% OFF on all luxury jewelry above ₹499',
-    active: true,
-    usesCount: 18,
-    createdAt: '2026-09-20'
-  },
-  {
-    id: 'coupon-royal20',
-    code: 'ROYAL20',
-    discountPercent: 20,
-    minAmount: 999,
-    description: '20% OFF on grand royal jewelry orders above ₹999',
-    active: true,
-    usesCount: 32,
-    createdAt: '2026-09-21'
-  },
-  {
-    id: 'coupon-festive15',
-    code: 'FESTIVE15',
-    discountPercent: 15,
-    minAmount: 749,
-    description: '15% OFF on 18K gold polish orders above ₹749',
-    active: true,
-    usesCount: 12,
-    createdAt: '2026-09-22'
-  }
-];
+
+export const DEFAULT_COUPONS = [];
+
 
 // ============================================================
 // VALEORA CENTRAL REACTIVE STATE & STORE
@@ -132,16 +104,16 @@ class AppState {
       : [];
     localStorage.setItem('valeora_queries', JSON.stringify(this.queries));
 
-    // Purge legacy sample registered users
+    // Registered patrons catalog
     const rawRegUsers = JSON.parse(localStorage.getItem('valeora_registered_users') || '[]');
-    if (Array.isArray(rawRegUsers)) {
-      const cleanRegUsers = rawRegUsers.filter(u =>
+    this.registeredUsers = Array.isArray(rawRegUsers)
+      ? rawRegUsers.filter(u =>
         (u.email || '').toLowerCase() !== 'pooja.sharma@example.com' &&
         (u.email || '').toLowerCase() !== 'priya.s@techcorp.io' &&
         (u.email || '').toLowerCase() !== 'ananya.v@lifestyle.in'
-      );
-      localStorage.setItem('valeora_registered_users', JSON.stringify(cleanRegUsers));
-    }
+      )
+      : [];
+    localStorage.setItem('valeora_registered_users', JSON.stringify(this.registeredUsers));
 
     // Purge legacy sample returns
     const rawReturns = JSON.parse(localStorage.getItem('valeora_returns') || '[]');
@@ -182,9 +154,9 @@ class AppState {
       }
     });
 
-    // Coupons and Promotions initialization
+    // Coupons and Promotions initialization — loaded from Firestore only
     const savedCoupons = localStorage.getItem('valeora_coupons');
-    this.coupons = savedCoupons ? JSON.parse(savedCoupons) : DEFAULT_COUPONS;
+    this.coupons = savedCoupons ? JSON.parse(savedCoupons) : [];
     this.appliedCoupon = JSON.parse(localStorage.getItem('valeora_applied_coupon') || 'null');
     this.discountPercent = this.appliedCoupon ? this.appliedCoupon.discountPercent : 0;
     this.couponFeedback = null;
@@ -204,7 +176,34 @@ class AppState {
     this._changeFlags = {};
     this._listeners = new Set();
 
+    // Instant local BroadcastChannel for multi-admin browser sessions
+    this.adminChannel = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        this.adminChannel = new BroadcastChannel('valeora_admin_realtime_sync');
+        this.adminChannel.onmessage = (event) => {
+          if (event.data?.type === 'PRODUCTS_SYNC' && Array.isArray(event.data.products)) {
+            this.products = event.data.products;
+            localStorage.setItem('valeora_products', JSON.stringify(this.products));
+            this._notify({ products: true });
+          } else if (event.data?.type === 'COUPONS_SYNC' && Array.isArray(event.data.coupons)) {
+            this.coupons = event.data.coupons;
+            localStorage.setItem('valeora_coupons', JSON.stringify(this.coupons));
+            this._notify({ coupons: true, cart: true });
+          } else if (event.data?.type === 'ORDERS_SYNC' && Array.isArray(event.data.orders)) {
+            this.orders = event.data.orders;
+            localStorage.setItem('valeora_orders', JSON.stringify(this.orders));
+            this._notify({ orders: true });
+          }
+        };
+      } catch (e) {
+        console.warn('BroadcastChannel initialization warning:', e);
+      }
+    }
+
     this.initCouponsSync();
+    this.initUsersSync();
+    this._initCrossTabSync();
   }
 
   subscribe(cb) {
@@ -232,10 +231,16 @@ class AppState {
     localStorage.setItem('valeora_products', JSON.stringify(this.products));
     localStorage.setItem('valeora_coupons', JSON.stringify(this.coupons));
     localStorage.setItem('valeora_applied_coupon', JSON.stringify(this.appliedCoupon));
+    if (this.registeredUsers) {
+      localStorage.setItem('valeora_registered_users', JSON.stringify(this.registeredUsers));
+    }
 
-    // Cross-device cart cloud synchronization
-    if (this.user?.uid) {
-      saveUserDoc(this.user.uid, { cart: this.cart }).catch(e => console.warn('Firestore cart sync:', e));
+    // Cross-device cart cloud synchronization (Debounced)
+    if (this.user?.uid && this._changeFlags?.cart) {
+      clearTimeout(this._cartSyncTimeout);
+      this._cartSyncTimeout = setTimeout(() => {
+        saveUserDoc(this.user.uid, { cart: this.cart }).catch(e => console.warn('Firestore cart sync:', e));
+      }, 2000);
     }
   }
 
@@ -267,44 +272,49 @@ class AppState {
   }
 
   initProductsSync() {
+    this._fetchProductsOnce();
+  }
+
+  async _fetchProductsOnce() {
     try {
-      this._unsubscribeProducts = subscribeToProducts((liveProds) => {
-        if (Array.isArray(liveProds)) {
-          const sampleProductIds = [
-            'imperial-ruby-choker-masterpiece',
-            'editorial-heritage-necklace',
-            'solitaire-pav-diamond-ring',
-            'diamond-brilliance-bracelet',
-            'grand-victorian-emerald-choker',
-            'for-him-onyx-signet-cufflinks',
-            'men-cuban-curb-chain',
-            'rose-gold-celestial-drop-earrings',
-            'for-her-solitaire-pendant',
-            'men-figaro-hand-bracelet'
-          ];
-          this.products = liveProds.filter(p => p && p.id && !sampleProductIds.includes(p.id) && !p._sample && !p._demo);
-          this._persist();
-          this._notify({ products: true });
-        }
-      });
+      const prods = await fetchProductsFromDb();
+      if (Array.isArray(prods) && prods.length > 0) {
+        const sampleProductIds = [
+          'imperial-ruby-choker-masterpiece',
+          'editorial-heritage-necklace',
+          'solitaire-pav-diamond-ring',
+          'diamond-brilliance-bracelet',
+          'grand-victorian-emerald-choker',
+          'for-him-onyx-signet-cufflinks',
+          'men-cuban-curb-chain',
+          'rose-gold-celestial-drop-earrings',
+          'for-her-solitaire-pendant',
+          'men-figaro-hand-bracelet'
+        ];
+        this.products = prods.filter(p => p && p.id && !sampleProductIds.includes(p.id) && !p._sample && !p._demo);
+        this._persist();
+        this._notify({ products: true });
+      }
     } catch (err) {
-      console.warn('Failed to sync products with Firestore:', err);
+      console.warn('Fallback products fetch failed:', err);
     }
   }
 
-  addProduct(productData) {
+
+  async addProduct(productData) {
     const slug = (productData.name || 'product')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
-    const id = `${slug}-${Date.now()}`;
+    const nowTs = Date.now();
+    const id = `${slug}-${nowTs}`;
     const newProduct = {
       id,
       name: productData.name,
-      tagline: productData.tagline || '18K Gold Finish · Sparkling Crystal Gemstones',
-      category: productData.category || 'Necklaces',
+      tagline: productData.tagline || `${productData.category || 'Jewelry'} · ${productData.subcategory || 'Signature Piece'}`,
+      category: productData.category || 'For Her',
       subcategory: productData.subcategory || 'Necklace',
-      audience: productData.audience || 'her',
+      audience: productData.audience || (productData.category === 'For Him' ? 'him' : (productData.category === 'For Her' ? 'her' : 'all')),
       price: Number(productData.price) || 299,
       originalPrice: Number(productData.originalPrice) || ((Number(productData.price) || 299) * 2),
       costPrice: Number(productData.costPrice) || Math.round((Number(productData.price) || 299) * 0.35),
@@ -312,18 +322,10 @@ class AppState {
       rating: Number(productData.rating) || 4.98,
       reviewsCount: Number(productData.reviewsCount) || Math.floor(25 + Math.random() * 80),
       badge: productData.badge || 'New Arrival',
-      image: productData.image || '/images/imperial_necklace.jpg',
-      galleryImages: productData.galleryImages || [productData.image || '/images/imperial_necklace.jpg'],
+      image: productData.image || '',
+      galleryImages: productData.galleryImages || (productData.image ? [productData.image] : []),
       servings: productData.servings || 'Adjustable Comfort Fit',
       description: productData.description || 'A stunning statement jewelry piece handcrafted with anti-fade mirror polish and sparkling simulated crystal stones.',
-      highlights: Array.isArray(productData.highlights) ? productData.highlights : (
-        productData.highlights ? productData.highlights.split(',').map(s => s.trim()).filter(Boolean) : [
-          'Long-lasting mirror polish that will not fade',
-          'Premium 18K gold / silver rhodium coat',
-          'Hypoallergenic, lead-free and nickel-free (skin safe)',
-          'Free luxury gift box included with every order'
-        ]
-      ),
       supplementFacts: {
         servingSize: 'Standard Adjustable Fit',
         servingsPerContainer: 'Daily & Festive Wear',
@@ -332,28 +334,42 @@ class AppState {
           { name: 'Plating', amount: 'Premium 18K Polish Coat', dv: 'Anti-Fade' },
           { name: 'Gems', amount: 'Brilliant Cut Crystal Stones', dv: 'Diamond Shine' }
         ]
-      }
+      },
+      createdAt: nowTs,
+      _pendingSync: true
     };
 
     this.products.unshift(newProduct);
     this._persist();
     this._notify({ products: true });
-    saveProductToDb(newProduct).catch(e => console.warn('Firestore add product:', e));
+
+    try {
+      this.adminChannel?.postMessage({ type: 'PRODUCTS_SYNC', products: this.products });
+    } catch (e) { }
+
+    try {
+      const saved = await saveProductToDb(newProduct);
+      if (saved) {
+        delete newProduct._pendingSync;
+        this._persist();
+      }
+    } catch (err) {
+      console.warn('Firestore add product warning:', err);
+    }
+
     return newProduct;
   }
 
-  updateProduct(productId, updatedData) {
+  async updateProduct(productId, updatedData) {
     const idx = this.products.findIndex(item => item.id === productId);
     if (idx > -1) {
-      const parsedHighlights = Array.isArray(updatedData.highlights)
-        ? updatedData.highlights
-        : (updatedData.highlights ? updatedData.highlights.split(',').map(s => s.trim()).filter(Boolean) : this.products[idx].highlights);
+
 
       this.products[idx] = {
         ...this.products[idx],
         ...updatedData,
         subcategory: updatedData.subcategory || this.products[idx].subcategory || this.products[idx].category,
-        highlights: parsedHighlights,
+
         image: updatedData.image || this.products[idx].image,
         galleryImages: Array.isArray(updatedData.galleryImages) && updatedData.galleryImages.length > 0
           ? updatedData.galleryImages
@@ -365,26 +381,41 @@ class AppState {
       };
       this._persist();
       this._notify({ products: true });
+
+      try {
+        this.adminChannel?.postMessage({ type: 'PRODUCTS_SYNC', products: this.products });
+      } catch (e) { }
+
       saveProductToDb(this.products[idx]).catch(e => console.warn('Firestore update product:', e));
       return this.products[idx];
     }
   }
 
-  updateProductStock(productId, newQty) {
+  async updateProductStock(productId, newQty) {
     const p = this.products.find(item => item.id === productId);
     if (p) {
       p.stockQty = Math.max(0, Number(newQty) || 0);
       this._persist();
       this._notify({ products: true });
+
+      try {
+        this.adminChannel?.postMessage({ type: 'PRODUCTS_SYNC', products: this.products });
+      } catch (e) { }
+
       saveProductToDb(p).catch(e => console.warn('Firestore update stock:', e));
       return p;
     }
   }
 
-  deleteProduct(productId) {
+  async deleteProduct(productId) {
     this.products = this.products.filter(item => item.id !== productId);
     this._persist();
     this._notify({ products: true });
+
+    try {
+      this.adminChannel?.postMessage({ type: 'PRODUCTS_SYNC', products: this.products });
+    } catch (e) { }
+
     deleteProductFromDb(productId).catch(e => console.warn('Firestore delete product:', e));
   }
 
@@ -475,7 +506,7 @@ class AppState {
         this._persist();
         this._notify({ queries: true });
       }
-    });
+    }, targetUserId, targetEmail);
   }
 
   updateUserProfile(updates) {
@@ -722,28 +753,155 @@ class AppState {
     return netSubtotal + this.getCartShipping();
   }
 
-  initCouponsSync() {
+  async initCouponsSync() {
+    // Purge any legacy dummy coupon IDs from localStorage so they don't linger
+    const dummyIds = ['coupon-valeora10', 'coupon-royal20', 'coupon-festive15'];
+    this.coupons = (this.coupons || []).filter(c => !dummyIds.includes(c.id));
+    localStorage.setItem('valeora_coupons', JSON.stringify(this.coupons));
+
     try {
-      this._unsubscribeCoupons = subscribeToCoupons((liveCoupons) => {
-        if (Array.isArray(liveCoupons) && liveCoupons.length > 0) {
-          this.coupons = liveCoupons;
-          if (this.appliedCoupon) {
-            const matched = this.coupons.find(c => c.code === this.appliedCoupon.code && c.active);
-            if (!matched) {
-              this.appliedCoupon = null;
-              this.discountPercent = 0;
-            } else {
-              this.appliedCoupon = matched;
-              this.discountPercent = matched.discountPercent;
-            }
+      const { fetchCouponsFromDb } = await import('./services/firebase.js');
+      const liveCoupons = await fetchCouponsFromDb();
+      if (Array.isArray(liveCoupons)) {
+        // Filter out any legacy dummy coupon IDs that may still be in Firestore
+        this.coupons = liveCoupons.filter(c => !dummyIds.includes(c.id));
+        if (this.appliedCoupon) {
+          const matched = this.coupons.find(c => c.code === this.appliedCoupon.code && c.active);
+          if (!matched) {
+            this.appliedCoupon = null;
+            this.discountPercent = 0;
+          } else {
+            this.appliedCoupon = matched;
+            this.discountPercent = matched.discountPercent;
           }
-          this._persist();
-          this._notify({ coupons: true, cart: true });
+        }
+        this._persist();
+        this._notify({ coupons: true, cart: true });
+      }
+    } catch (err) {
+      console.warn('Coupons fetch error:', err);
+    }
+  }
+
+
+  initUsersSync() {
+    if (!this.isAdmin) return; // Only admin needs to fetch all registered users
+    
+    try {
+      this._unsubscribeUsers = subscribeToUsers((liveUsers) => {
+        if (Array.isArray(liveUsers) && liveUsers.length > 0) {
+          const mergedMap = new Map();
+          (this.registeredUsers || []).forEach(u => {
+            const key = (u.email || u.uid || u.id || '').toLowerCase();
+            if (key) mergedMap.set(key, u);
+          });
+          liveUsers.forEach(u => {
+            const key = (u.email || u.uid || u.id || '').toLowerCase();
+            if (key) {
+              const existing = mergedMap.get(key) || {};
+              mergedMap.set(key, { ...existing, ...u });
+            }
+          });
+          this.registeredUsers = Array.from(mergedMap.values());
+          localStorage.setItem('valeora_registered_users', JSON.stringify(this.registeredUsers));
+          this._notify({ users: true });
         }
       });
-      seedCouponsIfEmpty(DEFAULT_COUPONS);
     } catch (err) {
-      console.warn('Coupons sync initialization error:', err);
+      console.warn('Users sync initialization error:', err);
+    }
+  }
+
+  _initCrossTabSync() {
+    if (typeof window === 'undefined') return;
+    window.addEventListener('storage', (e) => {
+      if (!e.key) return;
+
+      if (e.key === 'valeora_products' && e.newValue) {
+        try {
+          const prods = JSON.parse(e.newValue);
+          if (Array.isArray(prods)) {
+            this.products = prods;
+            this._notify({ products: true });
+          }
+        } catch (err) { }
+      } else if (e.key === 'valeora_coupons' && e.newValue) {
+        try {
+          const coups = JSON.parse(e.newValue);
+          if (Array.isArray(coups)) {
+            this.coupons = coups;
+            this._notify({ coupons: true, cart: true });
+          }
+        } catch (err) { }
+      } else if (e.key === 'valeora_user') {
+        try {
+          const u = e.newValue ? JSON.parse(e.newValue) : null;
+          this.user = u;
+          this.isAdmin = Boolean(u && (u.role === 'admin' || isAdminEmail(u.email)));
+          this._notify({ user: true, auth: true, navbar: true });
+        } catch (err) { }
+      } else if (e.key === 'valeora_registered_users' && e.newValue) {
+        try {
+          const reg = JSON.parse(e.newValue);
+          if (Array.isArray(reg)) {
+            this.registeredUsers = reg;
+            this._notify({ users: true });
+          }
+        } catch (err) { }
+      } else if (e.key === 'valeora_orders' && e.newValue) {
+        try {
+          const ords = JSON.parse(e.newValue);
+          if (Array.isArray(ords)) {
+            this.orders = ords;
+            this._notify({ orders: true });
+          }
+        } catch (err) { }
+      } else if (e.key === 'valeora_queries' && e.newValue) {
+        try {
+          const qrys = JSON.parse(e.newValue);
+          if (Array.isArray(qrys)) {
+            this.queries = qrys;
+            this._notify({ queries: true });
+          }
+        } catch (err) { }
+      } else if (e.key === 'valeora_returns' && e.newValue) {
+        this._notify({ returns: true });
+      }
+    });
+  }
+
+  recordRegisteredUser(userData) {
+    if (!userData || !userData.email) return;
+    const cleanEmail = userData.email.trim().toLowerCase();
+    const isAdm = isAdminEmail(cleanEmail) || userData.role === 'admin';
+
+    const patronEntry = {
+      uid: userData.uid || null,
+      id: userData.id || `USR-${(userData.uid || String(Math.floor(1000 + Math.random() * 9000))).slice(0, 5).toUpperCase()}`,
+      name: userData.name || userData.displayName || cleanEmail.split('@')[0],
+      email: cleanEmail,
+      phone: userData.phone || userData.phoneNumber || '',
+      city: userData.city || (userData.address?.city || 'Delhi'),
+      pincode: userData.pincode || (userData.address?.pincode || ''),
+      role: isAdm ? 'admin' : 'customer',
+      membership: isAdm ? 'Administrator' : (userData.membership || 'Valeora Atelier Patron'),
+      memberSince: userData.memberSince || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      status: 'active'
+    };
+
+    const existingIdx = (this.registeredUsers || []).findIndex(u => (u.email || '').toLowerCase() === cleanEmail);
+    if (existingIdx > -1) {
+      this.registeredUsers[existingIdx] = { ...this.registeredUsers[existingIdx], ...patronEntry };
+    } else {
+      this.registeredUsers.unshift(patronEntry);
+    }
+
+    localStorage.setItem('valeora_registered_users', JSON.stringify(this.registeredUsers));
+    this._notify({ users: true });
+
+    // Sync to Firestore if uid exists
+    if (userData.uid) {
+      saveUserDoc(userData.uid, patronEntry).catch(e => console.warn('Record user in Firestore:', e));
     }
   }
 
@@ -771,6 +929,9 @@ class AppState {
 
     this._persist();
     this._notify({ coupons: true, cart: true });
+    try {
+      this.adminChannel?.postMessage({ type: 'COUPONS_SYNC', coupons: this.coupons });
+    } catch (e) { }
 
     saveCouponToDb(newCoupon).catch(e => console.warn('Firestore coupon write:', e));
     return { success: true, coupon: newCoupon };
@@ -791,6 +952,9 @@ class AppState {
       }
       this._persist();
       this._notify({ coupons: true, cart: true });
+      try {
+        this.adminChannel?.postMessage({ type: 'COUPONS_SYNC', coupons: this.coupons });
+      } catch (e) { }
       updateCouponInDb(couponId, updates).catch(e => console.warn('Firestore coupon update:', e));
       return true;
     }
@@ -806,6 +970,9 @@ class AppState {
     }
     this._persist();
     this._notify({ coupons: true, cart: true });
+    try {
+      this.adminChannel?.postMessage({ type: 'COUPONS_SYNC', coupons: this.coupons });
+    } catch (e) { }
     deleteCouponFromDb(couponId).catch(e => console.warn('Firestore coupon delete:', e));
     return true;
   }

@@ -15,18 +15,36 @@ export function renderProductCard(product) {
 
   return `
     <div class="valeora-product-card ${isOutOfStock ? 'is-out-of-stock' : ''}" data-product-id="${product.id}" style="cursor: pointer;">
-      <div class="product-thumb-wrap" data-action="quick-view" data-product-id="${product.id}">
-        <img src="${product.image}" alt="${product.name}" loading="lazy">
+      <div class="product-thumb-wrap" data-action="quick-view" data-product-id="${product.id}" style="position: relative;">
+        ${(() => {
+          let imgs = product.galleryImages || [];
+          imgs = imgs.filter(img => img && img.trim() !== '');
+          if (imgs.length === 0) imgs = [product.image];
+          // Limit to max 4 images for the carousel logic
+          if (imgs.length > 4) imgs = imgs.slice(0, 4);
+
+          if (imgs.length === 1) {
+            return `<img src="${imgs[0]}" alt="${product.name}" loading="lazy" style="position: relative; width: 100%; height: 100%; object-fit: cover;">`;
+          }
+
+          const n = imgs.length;
+          const cycleLength = n * 3;
+          return imgs.map((img, i) => {
+            // delay logic: - (T - i*3)
+            const delay = -(cycleLength - i * 3);
+            return `<img src="${img}" alt="${product.name}" loading="lazy" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; animation: crossfade-${n} ${cycleLength}s infinite; animation-delay: ${delay}s;">`;
+          }).join('');
+        })()}
+
         ${isOutOfStock 
-          ? `<span class="product-feature-badge product-out-of-stock-badge" style="background: rgba(185, 28, 28, 0.95); color: #FFFFFF; font-weight: 700; border-color: rgba(255,255,255,0.4);">Out of Stock</span>`
-          : (product.badge ? `<span class="product-feature-badge">${product.badge}</span>` : `<span class="product-discount-badge">${discountPercent}% OFF</span>`)
+          ? `<span class="product-feature-badge product-out-of-stock-badge" style="background: rgba(185, 28, 28, 0.95); color: #FFFFFF; font-weight: 700; border-color: rgba(255,255,255,0.4); z-index: 10;">Out of Stock</span>`
+          : (product.badge ? `<span class="product-feature-badge" style="z-index: 10;">${product.badge}</span>` : `<span class="product-discount-badge" style="z-index: 10;">${discountPercent}% OFF</span>`)
         }
       </div>
 
       <div class="product-card-body">
         <div class="product-card-meta-row">
           <span class="product-card-category">${product.subcategory || product.category}</span>
-          <span class="product-card-rating">★ ${product.rating || '4.9'}</span>
         </div>
         <h4 class="product-card-title" data-action="quick-view" data-product-id="${product.id}" title="${product.name}">${product.name}</h4>
         

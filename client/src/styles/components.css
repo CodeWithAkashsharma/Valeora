@@ -10,24 +10,23 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 1000;
+  z-index: 99999;
+  pointer-events: auto;
   height: 74px;
-  background: transparent;
-  border-bottom: none !important;
-  border: none !important;
-  box-shadow: none !important;
-  transition: background 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    backdrop-filter 0.4s ease,
-    border-color 0.4s ease,
-    box-shadow 0.4s ease;
-}
-
-.valeora-navbar.scrolled {
-  background: rgba(22, 4, 10, 0.68);
+  background: rgba(22, 4, 10, 0.78);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid rgba(236, 207, 208, 0.16);
-  box-shadow: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: none;
+}
+
+.valeora-navbar.scrolled {
+  background: rgba(18, 3, 8, 0.92);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border-bottom: 1px solid rgba(236, 207, 208, 0.22);
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.5);
 }
 
 .navbar-container {
@@ -56,7 +55,7 @@
 }
 
 .nav-brand-link:hover .nav-brand-logo-img {
-  transform: scale(1.08) rotate(3deg);
+/*   transform: scale(1.08) rotate(3deg); */
   border-color: rgba(236, 207, 208, 0.85);
   box-shadow: 0 0 20px rgba(236, 207, 208, 0.5), 0 4px 14px rgba(0, 0, 0, 0.6);
 }
@@ -89,7 +88,6 @@
 }
 
 .nav-brand-link:hover .nav-brand-text {
-  letter-spacing: 0.26em;
   color: #ffffff;
   text-shadow: 0 0 16px rgba(236, 207, 208, 0.6);
 }
@@ -130,8 +128,7 @@
   text-decoration: none;
   transition: color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
     text-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-    letter-spacing 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -159,13 +156,11 @@
 /* Hover Interaction: Text Glow & Laser Underline */
 .nav-link-item:hover {
   color: #ffffff;
-  transform: translateY(-1px);
-  letter-spacing: 0.2em;
   text-shadow: 0 0 12px rgba(255, 255, 255, 0.85), 0 0 22px rgba(236, 207, 208, 0.6);
 }
 
 .nav-link-item:hover::after {
-  transform: translateX(-50%) scaleX(1);
+/*   transform: translateX(-50%) scaleX(1); */
   opacity: 1;
 }
 
@@ -173,7 +168,6 @@
 .nav-link-item.active {
   color: #ffffff;
   font-weight: 600;
-  letter-spacing: 0.2em;
   text-shadow: 0 0 14px rgba(255, 255, 255, 0.9), 0 0 24px rgba(236, 207, 208, 0.7);
 }
 
@@ -184,8 +178,7 @@
 
 /* Click Press Micro-Spring */
 .nav-link-item:active {
-  transform: scale(0.95) translateY(0);
-  transition: transform 0.08s ease;
+  color: inherit;
 }
 
 /* -------------------------------------------------------------
@@ -224,7 +217,6 @@
 
 .nav-floating-btn:hover {
   color: #ECCFD0;
-  transform: translateY(-1px);
 }
 
 .nav-floating-btn:active {
@@ -238,7 +230,7 @@
 
 .nav-floating-btn:hover .lux-bag-icon {
   stroke: #ECCFD0;
-  transform: scale(1.08);
+/*   transform: scale(1.08); */
 }
 
 .nav-floating-badge {
@@ -342,20 +334,16 @@
 
   .valeora-navbar {
     height: 70px !important;
-    background: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border-bottom: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    transition: background 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-      backdrop-filter 0.4s ease,
-      border-color 0.4s ease,
-      box-shadow 0.4s ease;
+    background: rgba(22, 4, 10, 0.84) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border-bottom: 1px solid rgba(236, 207, 208, 0.18) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+    transition: none;
   }
 
   .valeora-navbar.scrolled {
-    background: linear-gradient(180deg, rgba(22, 3, 10, 0.90) 0%, rgba(12, 1, 6, 0.85) 100%) !important;
+    background: linear-gradient(180deg, rgba(22, 3, 10, 0.95) 0%, rgba(12, 1, 6, 0.92) 100%) !important;
     backdrop-filter: blur(26px) !important;
     -webkit-backdrop-filter: blur(26px) !important;
     border-bottom: 1px solid rgba(236, 207, 208, 0.24) !important;
@@ -449,7 +437,6 @@
 
 .nav-icon-btn:hover {
   color: #ffffff;
-  transform: translateY(-1px) scale(1.08);
 }
 
 .nav-icon-btn:hover svg {
@@ -483,7 +470,7 @@
 }
 
 .nav-icon-btn:hover .nav-badge-count {
-  transform: scale(1.15);
+/*   transform: scale(1.15); */
 }
 
 /* ==========================================================================
@@ -794,12 +781,12 @@
 }
 
 .mobile-drawer-link:hover {
-  transform: translateX(4px);
+/*   transform: translateX(4px); */
 }
 
 .mobile-drawer-link:hover .drawer-link-icon {
   stroke: #ECCFD0;
-  transform: scale(1.1);
+/*   transform: scale(1.1); */
   filter: drop-shadow(0 0 6px rgba(236, 207, 208, 0.6));
 }
 
@@ -809,7 +796,7 @@
 
 .mobile-drawer-link:hover .drawer-link-arrow {
   color: #ECCFD0;
-  transform: translateX(3px);
+/*   transform: translateX(3px); */
 }
 
 .mobile-drawer-link.active {
@@ -865,7 +852,7 @@
 
 .drawer-bag-quick-btn:hover {
   filter: brightness(1.06);
-  transform: translateY(-1px);
+/*   transform: translateY(-1px); */
   box-shadow: 0 6px 22px rgba(236, 207, 208, 0.45);
 }
 
@@ -927,7 +914,7 @@
 }
 
 .valeora-product-card:hover {
-  transform: translateY(-6px);
+/*   transform: translateY(-6px); */
   border-color: rgba(236, 207, 208, 0.35);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(236, 207, 208, 0.15);
   background: rgba(62, 12, 27, 0.88);
@@ -955,7 +942,7 @@
 }
 
 .valeora-product-card:hover .product-thumb-wrap img {
-  transform: scale(1.06);
+/*   transform: scale(1.06); */
 }
 
 /* Card Body (Dark Theme) */
@@ -1070,9 +1057,7 @@
 }
 
 .product-card-rating {
-  font-size: 0.72rem;
-  color: #ffc107;
-  font-weight: 600;
+  display: none !important;
 }
 
 .product-card-price-wrap {
@@ -1130,7 +1115,7 @@
 .btn-card-action:hover {
   background: #ffffff;
   color: #24030b;
-  transform: translateY(-2px);
+/*   transform: translateY(-2px); */
   box-shadow: 0 4px 14px rgba(236, 207, 208, 0.45);
 }
 
@@ -1227,7 +1212,7 @@
   background: var(--color-rose-pill);
   color: var(--color-rose-pill-text);
   border-color: var(--color-rose-pill);
-  transform: translateY(-2px);
+/*   transform: translateY(-2px); */
   box-shadow: none !important;
 }
 
@@ -1251,7 +1236,7 @@
   background: rgba(214, 184, 190, 0.15);
   color: #FFFFFF;
   border-color: rgba(214, 184, 190, 0.45);
-  transform: translateY(-1px);
+/*   transform: translateY(-1px); */
 }
 
 .shop-sub-pill-btn.active {
@@ -1592,11 +1577,16 @@
    Luxury Confirmation & Alert Modal System
    ========================================================================== */
 .confirm-modal-overlay {
-  z-index: 10000;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999999 !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 1, 5, 0.82);
+  background: rgba(10, 1, 5, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   padding: 16px;
@@ -1729,7 +1719,7 @@
 
 .confirm-btn-primary:hover {
   filter: brightness(1.08);
-  transform: translateY(-1px);
+/*   transform: translateY(-1px); */
 }
 
 .confirm-btn-danger {
@@ -1747,7 +1737,7 @@
 
 .confirm-btn-danger:hover {
   filter: brightness(1.1);
-  transform: translateY(-1px);
+/*   transform: translateY(-1px); */
 }
 
 /* Bottom Mobile Dock Navigation is replaced by Top Right Mobile Slide Drawer */
@@ -1764,7 +1754,7 @@
   height: 100vh;
   background: rgba(10, 1, 4, 0.8);
   backdrop-filter: blur(6px);
-  z-index: 2000;
+  z-index: 100000;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
@@ -1788,7 +1778,7 @@
   max-height: 100svh;
   background: linear-gradient(160deg, #D6B8BE 0%, #C4A2A9 100%);
   border-left: 1.5px solid rgba(85, 15, 38, 0.22);
-  z-index: 2001;
+  z-index: 100001;
   display: flex;
   flex-direction: column;
   box-shadow: -10px 0 40px rgba(0, 0, 0, 0.45);
@@ -1837,7 +1827,7 @@
 .cart-close-btn:hover {
   background: rgba(90, 14, 40, 0.18);
   color: #000000;
-  transform: scale(1.05);
+/*   transform: scale(1.05); */
 }
 
 .cart-drawer-body {
@@ -2021,7 +2011,7 @@
   position: fixed;
   bottom: 30px;
   right: 24px;
-  z-index: 9999;
+  z-index: 99999999 !important;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -2309,7 +2299,7 @@
 }
 
 .social-tooltip-item:hover .social-icon-btn {
-  transform: translateY(-3px);
+/*   transform: translateY(-3px); */
   border-color: rgba(255, 255, 255, 0.5);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
 }
@@ -2340,7 +2330,7 @@
 
 .social-tooltip-item:hover .social-svg-wrap {
   color: #FFFFFF !important;
-  transform: scale(1.1);
+/*   transform: scale(1.1); */
 }
 
 /* ==========================================================================
@@ -2709,7 +2699,7 @@
   color: #ffffff;
   background: rgba(236, 207, 208, 0.16);
   border-color: rgba(236, 207, 208, 0.4);
-  transform: translateX(-3px);
+/*   transform: translateX(-3px); */
   box-shadow: 0 0 15px rgba(236, 207, 208, 0.2);
 }
 
@@ -2793,7 +2783,7 @@
 .privilege-item:hover {
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(236, 207, 208, 0.35);
-  transform: translateX(4px);
+/*   transform: translateX(4px); */
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 15px rgba(236, 207, 208, 0.15);
 }
 
@@ -3128,7 +3118,7 @@
 
 .auth-pwd-toggle-btn:hover {
   color: #ffffff;
-  transform: scale(1.1);
+/*   transform: scale(1.1); */
 }
 
 /* Password Strength Meter */
@@ -3285,7 +3275,7 @@
 .auth-submit-btn:hover {
   background: linear-gradient(135deg, #FFFFFF 0%, #ECCFD0 100%);
   box-shadow: 0 8px 28px rgba(236, 207, 208, 0.55), 0 0 20px rgba(255, 255, 255, 0.4);
-  transform: translateY(-2px);
+/*   transform: translateY(-2px); */
 }
 
 .auth-submit-btn:hover::before {
@@ -3344,7 +3334,7 @@
 .auth-social-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(236, 207, 208, 0.45);
-  transform: translateY(-1.5px);
+/*   transform: translateY(-1.5px); */
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
@@ -3983,7 +3973,7 @@
 .profile-page-wrapper .btn-outline-blush:hover,
 .profile-page-wrapper #save-profile-btn:hover,
 .profile-page-wrapper #submit-query-btn:hover {
-  transform: translateY(-2px) !important;
+/*   transform: translateY(-2px) !important; */
   background: linear-gradient(135deg, #A82047 0%, #680E29 100%) !important;
   border-color: #ECCFD0 !important;
   box-shadow: 0 12px 30px rgba(138, 21, 56, 0.6) !important;
@@ -4002,7 +3992,7 @@
 
 .profile-page-wrapper .profile-ask-order-btn:hover {
   background: linear-gradient(145deg, #E6CCD2 0%, #D4B4BB 100%) !important;
-  transform: translateY(-2px) !important;
+/*   transform: translateY(-2px) !important; */
   box-shadow: 0 8px 20px rgba(214, 184, 190, 0.35) !important;
 }
 
@@ -4021,7 +4011,7 @@
   color: #FFFFFF !important;
   border-color: #E63946 !important;
   box-shadow: 0 4px 18px rgba(230, 57, 70, 0.45) !important;
-  transform: translateY(-2px) !important;
+/*   transform: translateY(-2px) !important; */
 }
 
 /* Personal Details Compact Card & OTP Modal */
@@ -5113,7 +5103,7 @@
     bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
     width: calc(100vw - 16px) !important;
     max-width: calc(100vw - 16px) !important;
-    z-index: 9999 !important;
+    z-index: 99999999 !important;
   }
 
   .toast {
@@ -5138,7 +5128,7 @@
     transform: translateX(-50%) !important;
     width: calc(100vw - 28px) !important;
     max-width: 480px !important;
-    z-index: 9999 !important;
+    z-index: 99999999 !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -5436,3 +5426,19 @@
     max-width: 80% !important;
   }
 }
+@keyframes crossfade-2 {
+  0%, 41.66% { opacity: 1; }
+  50%, 91.66% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes crossfade-3 {
+  0%, 27.77% { opacity: 1; }
+  33.33%, 94.44% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes crossfade-4 {
+  0%, 20.83% { opacity: 1; }
+  25%, 95.83% { opacity: 0; }
+  100% { opacity: 1; }
+}
+

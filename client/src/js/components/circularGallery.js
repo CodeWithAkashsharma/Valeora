@@ -417,26 +417,39 @@ export class CircularGallery {
     this.start = 0;
     this.hasMoved = false;
 
-    this.createRenderer();
-    this.createCamera();
-    this.createScene();
-    this.onResize();
-    this.createGeometry();
-    this.createMedias(items, bend, textColor, borderRadius, font);
-    this.update();
-    this.addEventListeners();
+    try {
+      this.createRenderer();
+      if (!this.gl) return;
+      this.createCamera();
+      this.createScene();
+      this.onResize();
+      this.createGeometry();
+      this.createMedias(items, bend, textColor, borderRadius, font);
+      this.update();
+      this.addEventListeners();
+    } catch (err) {
+      console.warn('CircularGallery initialization error (falling back gracefully):', err);
+    }
   }
 
   createRenderer() {
-    this.renderer = new Renderer({
-      alpha: true,
-      antialias: true,
-      dpr: Math.min(window.devicePixelRatio || 1, 2)
-    });
-    this.gl = this.renderer.gl;
-    this.gl.clearColor(0, 0, 0, 0);
-    this.container.innerHTML = '';
-    this.container.appendChild(this.renderer.gl.canvas);
+    try {
+      this.renderer = new Renderer({
+        alpha: true,
+        antialias: true,
+        dpr: Math.min(window.devicePixelRatio || 1, 2)
+      });
+      this.gl = this.renderer?.gl;
+      if (!this.gl) return;
+      this.gl.clearColor(0, 0, 0, 0);
+      this.container.innerHTML = '';
+      if (this.renderer.gl.canvas) {
+        this.container.appendChild(this.renderer.gl.canvas);
+      }
+    } catch (e) {
+      console.warn('WebGL Renderer create error:', e);
+      this.gl = null;
+    }
   }
 
   createCamera() {
@@ -660,21 +673,32 @@ export class CircularGallery {
   }
 
   destroy() {
-    window.cancelAnimationFrame(this.raf);
-    window.removeEventListener('resize', this.boundOnResize);
-    if (this.container) {
-      this.container.removeEventListener('wheel', this.boundOnWheel);
-      this.container.removeEventListener('mousedown', this.boundOnTouchDown);
-      this.container.removeEventListener('mouseenter', this.boundOnMouseEnter);
-      this.container.removeEventListener('mouseleave', this.boundOnMouseLeave);
-      this.container.removeEventListener('touchstart', this.boundOnTouchDown);
+    if (this.raf) {
+      window.cancelAnimationFrame(this.raf);
+      this.raf = null;
     }
-    window.removeEventListener('mousemove', this.boundOnTouchMove);
-    window.removeEventListener('mouseup', this.boundOnTouchUp);
-    window.removeEventListener('touchmove', this.boundOnTouchMove);
-    window.removeEventListener('touchend', this.boundOnTouchUp);
-    if (this.renderer && this.renderer.gl && this.renderer.gl.canvas && this.renderer.gl.canvas.parentNode) {
-      this.renderer.gl.canvas.parentNode.removeChild(this.renderer.gl.canvas);
+    if (this.boundOnResize) {
+      window.removeEventListener('resize', this.boundOnResize);
+    }
+    if (this.container) {
+      if (this.boundOnWheel) this.container.removeEventListener('wheel', this.boundOnWheel);
+      if (this.boundOnTouchDown) this.container.removeEventListener('mousedown', this.boundOnTouchDown);
+      if (this.boundOnMouseEnter) this.container.removeEventListener('mouseenter', this.boundOnMouseEnter);
+      if (this.boundOnMouseLeave) this.container.removeEventListener('mouseleave', this.boundOnMouseLeave);
+      if (this.boundOnTouchDown) this.container.removeEventListener('touchstart', this.boundOnTouchDown);
+    }
+    if (this.boundOnTouchMove) {
+      window.removeEventListener('mousemove', this.boundOnTouchMove);
+      window.removeEventListener('touchmove', this.boundOnTouchMove);
+    }
+    if (this.boundOnTouchUp) {
+      window.removeEventListener('mouseup', this.boundOnTouchUp);
+      window.removeEventListener('touchend', this.boundOnTouchUp);
+    }
+    if (this.renderer?.gl?.canvas?.parentNode) {
+      try {
+        this.renderer.gl.canvas.parentNode.removeChild(this.renderer.gl.canvas);
+      } catch (e) {}
     }
   }
 }

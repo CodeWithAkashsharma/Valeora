@@ -7,21 +7,31 @@ import { renderQuickViewModal, bindQuickViewEvents } from './components/quickVie
 import { renderCheckoutModal, bindCheckoutEvents } from './components/checkoutModal.js';
 import { renderAuthModal, bindAuthEvents } from './components/authModal.js';
 import { renderPolicyModal, bindPolicyModalEvents } from './components/policyModal.js';
-import { renderHomePage, bindHomePageEvents } from './pages/home.js';
+import { renderHomePage, bindHomePageEvents, updateCircularGallery } from './pages/home.js';
 import { renderShopPage, bindShopPageEvents, setShopFilter } from './pages/shop.js';
 import { renderAboutPage, bindAboutPageEvents } from './pages/about.js';
 import { renderSciencePage } from './pages/science.js';
 import { renderContactPage, bindContactPageEvents } from './pages/contact.js';
 import { renderProfilePage, bindProfilePageEvents } from './pages/profile.js';
-import { renderAdminPage, bindAdminPageEvents } from './pages/admin.js';
+import { renderAdminPage, bindAdminPageEvents, refreshAdminView } from './pages/admin.js';
 import { renderAdminLoginPage, bindAdminLoginPageEvents } from './pages/adminLogin.js';
 import { renderNotFoundPage, bindNotFoundPageEvents } from './pages/notFound.js';
+import { renderProductCard, bindProductCardEvents } from './components/productCard.js';
 import { showToast } from './components/toast.js';
-import { showAlertModal } from './components/confirmModal.js';
+import { showAlertModal, dismissConfirmModal } from './components/confirmModal.js';
 import { setModalAuthTab } from './components/authModal.js';
 import { auth, getUserDoc } from './services/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import { updateSEO } from './seo.js';
+
+function refreshNavbar() {
+  const navRoot = document.getElementById('navbar-root');
+  if (navRoot) {
+    navRoot.innerHTML = renderNavbar();
+    bindNavbarEvents();
+    updateNavbarScrollState();
+  }
+}
 
 // Ensure no native browser alert() dialog ever opens; always use luxury popup modal
 window.alert = (msg) => {
@@ -71,20 +81,21 @@ function updateNavbarScrollState() {
     return;
   }
 
+  // On home page, at top of screen (or scroll position near 0), navbar is always transparent
+  if (window.scrollY < 20) {
+    navbar.classList.remove('scrolled');
+    return;
+  }
+
   const heroSection = document.getElementById('hero-section');
-  if (heroSection) {
-    const threshold = heroSection.offsetHeight * 0.30;
-    if (window.scrollY >= threshold) {
-      navbar.classList.add('scrolled');
-    } else {
-      navbar.classList.remove('scrolled');
-    }
+  const threshold = (heroSection && heroSection.offsetHeight > 100)
+    ? Math.max(heroSection.offsetHeight * 0.30, 80)
+    : 80;
+
+  if (window.scrollY >= threshold) {
+    navbar.classList.add('scrolled');
   } else {
-    if (window.scrollY > 80) {
-      navbar.classList.add('scrolled');
-    } else {
-      navbar.classList.remove('scrolled');
-    }
+    navbar.classList.remove('scrolled');
   }
 }
 
@@ -127,9 +138,26 @@ function renderApp() {
       state.setRoute('admin');
       return;
     }
-    root.innerHTML = renderAdminLoginPage();
-    bindAdminLoginPageEvents();
+    root.innerHTML = `
+      <div id="navbar-root">${renderNavbar()}</div>
+      <main id="app-main-content" style="flex-grow:1; padding-top: 74px;">
+        ${renderAdminLoginPage()}
+      </main>
+      <div id="modal-cart-root">${renderCartDrawer()}</div>
+      <div id="modal-quickview-root">${renderQuickViewModal()}</div>
+      <div id="modal-checkout-root">${renderCheckoutModal()}</div>
+      <div id="modal-auth-root">${renderAuthModal()}</div>
+      <div id="modal-policy-root">${renderPolicyModal()}</div>
+    `;
+    try { bindNavbarEvents(); } catch (e) {}
+    try { bindCartEvents(); } catch (e) {}
+    try { bindQuickViewEvents(); } catch (e) {}
+    try { bindCheckoutEvents(); } catch (e) {}
+    try { bindAuthEvents(); } catch (e) {}
+    try { bindPolicyModalEvents(); } catch (e) {}
+    try { bindAdminLoginPageEvents(); } catch (e) {}
     updateSEO('admin-login');
+    updateNavbarScrollState();
     updateBodyScrollLock();
     return;
   }
@@ -182,7 +210,7 @@ function renderApp() {
   }
 
   root.innerHTML = `
-    ${renderNavbar()}
+    <div id="navbar-root">${renderNavbar()}</div>
     <main id="app-main-content" style="flex-grow:1;">
       ${pageContent}
     </main>
@@ -202,20 +230,24 @@ function renderApp() {
   bindAuthEvents();
   bindPolicyModalEvents();
 
-  if (currentRoute === 'home') {
-    bindHomePageEvents();
-  } else if (currentRoute === 'shop') {
-    bindShopPageEvents();
-  } else if (currentRoute === 'about') {
-    bindAboutPageEvents();
-  } else if (currentRoute === 'contact') {
-    bindContactPageEvents();
-  } else if (currentRoute === 'profile' && state.user && bindProfilePageEvents) {
-    bindProfilePageEvents();
-  } else if (currentRoute === 'admin' && state.user && state.isAdmin && bindAdminPageEvents) {
-    bindAdminPageEvents();
-  } else if (currentRoute === '404' && bindNotFoundPageEvents) {
-    bindNotFoundPageEvents();
+  try {
+    if (currentRoute === 'home') {
+      bindHomePageEvents();
+    } else if (currentRoute === 'shop') {
+      bindShopPageEvents();
+    } else if (currentRoute === 'about') {
+      bindAboutPageEvents();
+    } else if (currentRoute === 'contact') {
+      bindContactPageEvents();
+    } else if (currentRoute === 'profile' && state.user && bindProfilePageEvents) {
+      bindProfilePageEvents();
+    } else if (currentRoute === 'admin' && state.user && state.isAdmin && bindAdminPageEvents) {
+      bindAdminPageEvents();
+    } else if (currentRoute === '404' && bindNotFoundPageEvents) {
+      bindNotFoundPageEvents();
+    }
+  } catch (err) {
+    console.warn('Page-specific event binding warning:', err);
   }
 
   updateSEO(currentRoute);
@@ -235,6 +267,28 @@ document.addEventListener('click', (e) => {
     const product = catalog.find(p => p.id === pid);
     if (product) {
       state.setQuickViewProduct(product);
+    }
+    return;
+  }
+
+  // 1b. Navbar Cart Buttons delegation
+  const cartTrigger = e.target.closest('[data-action="cart"], #nav-cart-btn, #nav-mobile-cart-btn, #drawer-bag-quick-btn');
+  if (cartTrigger) {
+    e.preventDefault();
+    state.toggleMobileMenu(false);
+    state.toggleCart(true);
+    return;
+  }
+
+  // 1c. Navbar User / Profile Button delegation
+  const userTrigger = e.target.closest('[data-action="user"], #nav-user-btn');
+  if (userTrigger) {
+    e.preventDefault();
+    state.toggleMobileMenu(false);
+    if (state.user) {
+      state.setRoute('profile');
+    } else {
+      state.toggleAuthModal(true);
     }
     return;
   }
@@ -274,7 +328,7 @@ document.addEventListener('click', (e) => {
 
     if (route && VALID_ROUTES.includes(route)) {
       state.setRoute(route);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
     return;
   }
@@ -338,7 +392,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Listen to state changes with surgical DOM updates (0ms latency, zero scroll jump)
   state.subscribe((s, flags) => {
     if (flags.route) {
+      savedScrollPosition = 0;
       window.scrollTo({ top: 0, behavior: 'instant' });
+      dismissConfirmModal();
       renderApp();
       return;
     }
@@ -392,7 +448,70 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (flags.user !== undefined || flags.queries !== undefined || flags.orders !== undefined) {
+    if (flags.products !== undefined) {
+      if (state.currentRoute === 'shop') {
+        const main = document.getElementById('app-main-content');
+        if (main) {
+          main.innerHTML = renderShopPage();
+          bindShopPageEvents();
+        }
+      } else if (state.currentRoute === 'home') {
+        const homeFeaturedGrid = document.getElementById('home-featured-grid');
+        if (homeFeaturedGrid) {
+          const allProducts = state.products || [];
+          const featuredArrivals = allProducts.slice(0, 4);
+          homeFeaturedGrid.innerHTML = featuredArrivals.length > 0
+            ? featuredArrivals.map(product => product ? renderProductCard(product) : '').join('')
+            : `
+                <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(214,184,190,0.2); border-radius: 16px; color: #ECCFD0; font-size: 0.88rem;">
+                  ✨ New signature jewelry pieces are being added to the catalog.
+                </div>
+              `;
+          bindProductCardEvents(homeFeaturedGrid, allProducts);
+        }
+        updateCircularGallery();
+      } else if (state.currentRoute === 'admin' && state.user && state.isAdmin) {
+        refreshAdminView(true);
+      }
+
+      if (state.quickViewProduct) {
+        const updated = (state.products || []).find(p => p.id === state.quickViewProduct.id);
+        if (updated) {
+          state.quickViewProduct = updated;
+          const qvRoot = document.getElementById('modal-quickview-root');
+          if (qvRoot) {
+            qvRoot.innerHTML = renderQuickViewModal();
+            bindQuickViewEvents();
+          }
+        }
+      }
+    }
+
+    if (flags.coupons !== undefined) {
+      const cartRoot = document.getElementById('modal-cart-root');
+      if (cartRoot) {
+        cartRoot.innerHTML = renderCartDrawer();
+        bindCartEvents();
+      }
+      const chkRoot = document.getElementById('modal-checkout-root');
+      if (chkRoot && state.isCheckoutOpen) {
+        chkRoot.innerHTML = renderCheckoutModal();
+        bindCheckoutEvents();
+      }
+      if (state.currentRoute === 'admin' && state.user && state.isAdmin) {
+        refreshAdminView(true);
+      }
+    }
+
+    if (flags.users !== undefined) {
+      refreshNavbar();
+      if (state.currentRoute === 'admin' && state.user && state.isAdmin) {
+        refreshAdminView(true);
+      }
+    }
+
+    if (flags.user !== undefined || flags.auth !== undefined) {
+      refreshNavbar();
       if (state.currentRoute === 'profile') {
         const main = document.getElementById('app-main-content');
         if (main) {
@@ -405,16 +524,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } else if (state.currentRoute === 'admin') {
         if (state.user && state.isAdmin) {
-          const root = document.getElementById('app-root');
-          if (root && renderAdminPage) {
-            root.innerHTML = renderAdminPage();
-            if (bindAdminPageEvents) bindAdminPageEvents();
-          }
+          refreshAdminView(true);
         } else {
           state.setRoute('admin-login');
         }
       } else if (state.currentRoute === 'admin-login' && state.user && state.isAdmin) {
         state.setRoute('admin');
+      }
+    }
+
+    if (flags.orders !== undefined) {
+      if (state.currentRoute === 'profile' && state.user) {
+        const main = document.getElementById('app-main-content');
+        if (main) {
+          main.innerHTML = renderProfilePage();
+          bindProfilePageEvents();
+        }
+      } else if (state.currentRoute === 'admin' && state.user && state.isAdmin) {
+        refreshAdminView(true);
+      }
+    }
+
+    if (flags.queries !== undefined) {
+      if (state.currentRoute === 'profile' && state.user) {
+        const main = document.getElementById('app-main-content');
+        if (main) {
+          main.innerHTML = renderProfilePage();
+          bindProfilePageEvents();
+        }
+      } else if (state.currentRoute === 'admin' && state.user && state.isAdmin) {
+        refreshAdminView(true);
+      }
+    }
+
+    if (flags.returns !== undefined) {
+      if (state.currentRoute === 'admin' && state.user && state.isAdmin) {
+        refreshAdminView(true);
       }
     }
 
@@ -446,6 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('popstate', () => {
     const route = parseRouteFromURL();
     state.currentRoute = route;
+    dismissConfirmModal();
     renderApp();
   });
 });

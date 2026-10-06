@@ -5,7 +5,7 @@ import { showToast } from '../components/toast.js';
 export function renderAdminLoginPage() {
   return `
     <div class="admin-login-wrapper" style="
-      min-height: 100vh;
+      min-height: calc(100vh - 74px);
       display: flex;
       align-items: center;
       justify-content: center;

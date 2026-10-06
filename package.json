@@ -12,6 +12,7 @@
     "build": "npm --prefix client run build",
     "preview": "npm --prefix client run preview",
     "deploy": "npm run build && firebase deploy --only hosting",
+    "deploy:fast": "firebase deploy --only hosting",
     "deploy:all": "npm run build && firebase deploy"
   },
   "devDependencies": {

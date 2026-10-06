@@ -26,7 +26,8 @@ import {
   where,
   orderBy,
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  limit
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -34,6 +35,7 @@ import {
   uploadBytes,
   getDownloadURL
 } from 'firebase/storage';
+import { compressDataUrlIfNeeded } from './imageOptimizer.js';
 
 // Official Valeora Firebase Configuration
 export const firebaseConfig = {
@@ -445,9 +447,16 @@ export async function saveQueryToDb(queryData) {
 /**
  * Subscribe to Support Queries Real-Time
  */
-export function subscribeToQueries(callback) {
+export function subscribeToQueries(callback, userId = null, email = null) {
   try {
-    const q = query(collection(db, 'queries'));
+    let q;
+    if (userId) {
+      q = query(collection(db, 'queries'), where('userId', '==', userId));
+    } else if (email) {
+      q = query(collection(db, 'queries'), where('email', '==', email));
+    } else {
+      q = query(collection(db, 'queries'));
+    }
     return onSnapshot(q, (snapshot) => {
       const queries = snapshot.docs.map(doc => ({
         firestoreId: doc.id,
@@ -558,6 +567,11 @@ export function subscribeToUsers(callback) {
           ...data
         };
       });
+      users.sort((a, b) => {
+        const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.lastLogin?.seconds ? a.lastLogin.seconds * 1000 : 0);
+        const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.lastLogin?.seconds ? b.lastLogin.seconds * 1000 : 0);
+        return timeB - timeA;
+      });
       callback(users);
     }, (err) => {
       console.warn('Users realtime subscription error:', err);
@@ -631,11 +645,28 @@ export async function updateReturnInDb(claimId, data) {
 }
 
 /**
+ * Sanitize an object for Firestore by removing any undefined keys
+ */
+export function sanitizeFirestoreDoc(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeFirestoreDoc).filter(v => v !== undefined);
+  }
+  const clean = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      clean[key] = sanitizeFirestoreDoc(value);
+    }
+  }
+  return clean;
+}
+
+/**
  * Fetch All Products from Firestore Database
  */
 export async function fetchProductsFromDb() {
   try {
-    const q = query(collection(db, 'products'));
+    const q = query(collection(db, 'products'), limit(100));
     const snap = await getDocs(q);
     if (!snap.empty) {
       return snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
@@ -649,18 +680,51 @@ export async function fetchProductsFromDb() {
 
 /**
  * Save or Update Product in Firestore Database
+ * Automatically compresses large image payloads to guarantee payload stays <150KB
+ * and sanitizes undefined values so setDoc never fails.
  */
 export async function saveProductToDb(product) {
   try {
     if (!product || !product.id) return false;
-    const prodRef = doc(db, 'products', product.id);
+
+    // 1. Sanitize to prevent "Unsupported field value: undefined"
+    const cleanProduct = sanitizeFirestoreDoc({ ...product });
+
+    // 2. Safeguard: compress main image if larger than 150KB
+    if (cleanProduct.image && cleanProduct.image.startsWith('data:image/') && cleanProduct.image.length > 150000) {
+      try {
+        cleanProduct.image = await compressDataUrlIfNeeded(cleanProduct.image);
+      } catch (e) {
+        console.warn('Image compression warning in saveProductToDb:', e);
+      }
+    }
+
+    // 3. Safeguard: compress gallery images if larger than 150KB
+    if (Array.isArray(cleanProduct.galleryImages)) {
+      cleanProduct.galleryImages = await Promise.all(
+        cleanProduct.galleryImages.map(async (img) => {
+          if (img && typeof img === 'string' && img.startsWith('data:image/') && img.length > 150000) {
+            try {
+              return await compressDataUrlIfNeeded(img);
+            } catch (e) {
+              return img;
+            }
+          }
+          return img;
+        })
+      );
+    }
+
+    const prodRef = doc(db, 'products', cleanProduct.id);
     await setDoc(prodRef, {
-      ...product,
+      ...cleanProduct,
+      createdAt: cleanProduct.createdAt || Date.now(),
       updatedAt: serverTimestamp()
     }, { merge: true });
+
     return true;
   } catch (err) {
-    console.warn('Error saving product to Firestore:', err);
+    console.error('Error saving product to Firestore:', err);
     return false;
   }
 }
@@ -675,7 +739,7 @@ export async function deleteProductFromDb(productId) {
     await deleteDoc(prodRef);
     return true;
   } catch (err) {
-    console.warn('Error deleting product from Firestore:', err);
+    console.error('Error deleting product from Firestore:', err);
     return false;
   }
 }
@@ -687,18 +751,30 @@ export function subscribeToProducts(callback) {
   try {
     const q = query(collection(db, 'products'));
     return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const prods = snapshot.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
-        callback(prods);
-      }
+      const prods = snapshot.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
+      prods.sort((a, b) => {
+        const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (Number(a.createdAt) || (a.id && a.id.split('-').pop() && !isNaN(Number(a.id.split('-').pop())) ? Number(a.id.split('-').pop()) : 0));
+        const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (Number(b.createdAt) || (b.id && b.id.split('-').pop() && !isNaN(Number(b.id.split('-').pop())) ? Number(b.id.split('-').pop()) : 0));
+        return timeB - timeA;
+      });
+      callback(prods);
     }, (error) => {
-      console.warn('Products subscription error:', error);
+      console.warn('Products real-time subscription error (may be Firestore rules):', error.code, error.message);
+      // On permission error, fallback to a one-time getDocs read
+      if (error.code === 'permission-denied' || error.code === 'unavailable') {
+        fetchProductsFromDb().then(prods => {
+          if (Array.isArray(prods)) {
+            callback(prods);
+          }
+        }).catch(e => console.warn('Products fallback fetch error:', e));
+      }
     });
   } catch (e) {
     console.warn('Failed to subscribe to products:', e);
     return () => { };
   }
 }
+
 
 /**
  * Seed initial catalog to Firestore if empty
@@ -731,7 +807,7 @@ export async function seedProductsIfEmpty(initialProducts) {
  */
 export async function fetchCouponsFromDb() {
   try {
-    const q = query(collection(db, 'coupons'));
+    const q = query(collection(db, 'coupons'), limit(50));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
   } catch (err) {
@@ -801,9 +877,21 @@ export function subscribeToCoupons(callback) {
     const q = query(collection(db, 'coupons'));
     return onSnapshot(q, (snapshot) => {
       const coupons = snapshot.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
+      coupons.sort((a, b) => {
+        const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        return timeB - timeA;
+      });
       callback(coupons);
     }, (error) => {
       console.warn('Coupons subscription error:', error);
+      if (error.code === 'permission-denied' || error.code === 'unavailable') {
+        fetchCouponsFromDb().then(coupons => {
+          if (Array.isArray(coupons) && coupons.length > 0) {
+            callback(coupons);
+          }
+        }).catch(e => console.warn('Coupons fallback fetch error:', e));
+      }
     });
   } catch (e) {
     console.warn('Failed to subscribe to coupons:', e);

@@ -296,16 +296,7 @@ export function renderQuickViewModal() {
         box-shadow: 0 6px 20px rgba(236, 207, 208, 0.35);
       }
 
-      /* Hide Scrollbars completely across all devices and browsers */
-      .quickview-modal-dialog {
-        scrollbar-width: none !important; /* Firefox */
-        -ms-overflow-style: none !important; /* IE/Edge */
-      }
-      .quickview-modal-dialog::-webkit-scrollbar {
-        display: none !important; /* Chrome, Safari, Opera */
-        width: 0 !important;
-        height: 0 !important;
-      }
+
 
       /* Dedicated Tablet View (601px - 1100px) */
       @media (min-width: 601px) and (max-width: 1100px) {
@@ -403,13 +394,6 @@ export function renderQuickViewModal() {
           max-height: 88vh !important;
           box-shadow: 0 16px 45px rgba(0, 0, 0, 0.9), 0 0 25px rgba(236, 207, 208, 0.12) !important;
           overflow-y: auto !important;
-          scrollbar-width: none !important;
-          -ms-overflow-style: none !important;
-        }
-        .quickview-modal-dialog::-webkit-scrollbar {
-          display: none !important;
-          width: 0 !important;
-          height: 0 !important;
         }
         .quickview-close-btn {
           top: 10px !important;
@@ -534,20 +518,7 @@ export function renderQuickViewModal() {
           letter-spacing: normal !important;
           width: 100% !important;
         }
-        .quickview-specs-box {
-          padding: 10px 12px !important;
-          margin-bottom: 12px !important;
-          border-radius: 12px !important;
-        }
-        .quickview-specs-title {
-          font-size: 0.88rem !important;
-          margin-bottom: 5px !important;
-          padding-bottom: 4px !important;
-        }
-        .quickview-specs-list {
-          font-size: 0.78rem !important;
-          gap: 4px !important;
-        }
+
         .quickview-actions-row {
           padding-top: 12px !important;
           flex-direction: row !important;
@@ -687,24 +658,7 @@ export function renderQuickViewModal() {
                 ${product.description}
               </p>
 
-              <!-- Specification Micro-Grid -->
-              <div class="quickview-specs-box">
-                <div class="quickview-specs-title">
-                  Product Highlights
-                </div>
-                <div class="quickview-specs-list">
-                  ${(product.supplementFacts?.ingredients || [
-      { name: 'Polish', amount: '18K Long-Lasting Shine' },
-      { name: 'Metal', amount: 'Skin-Safe Hypoallergenic' },
-      { name: 'Packaging', amount: 'Valeora Gift Box Included' }
-    ]).slice(0, 3).map(ing => `
-                    <div style="display:flex; justify-content:space-between; color:var(--color-text-muted);">
-                      <span style="color:var(--color-text-secondary);">${ing.name}</span>
-                      <span style="font-weight:600; color:var(--color-rose-pill);">${ing.amount}</span>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
+
 
               <!-- Free Delivery Notice -->
               <div class="quickview-delivery-pill">

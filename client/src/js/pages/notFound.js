@@ -1,6 +1,17 @@
 import { state } from '../state.js';
 
 export function renderNotFoundPage() {
+
+    // Prevent Google from indexing this 404 page
+  let robots = document.querySelector('meta[name="robots"]');
+
+  if (!robots) {
+    robots = document.createElement('meta');
+    robots.name = 'robots';
+    document.head.appendChild(robots);
+  }
+
+  robots.content = 'noindex, nofollow';
   return `
     <div class="not-found-page-wrapper" style="
       min-height: calc(100vh - 120px);

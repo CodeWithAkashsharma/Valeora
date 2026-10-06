@@ -8,12 +8,12 @@ import {
   subscribeToUsers,
   createReturnInDb,
   subscribeToReturns,
-  updateReturnInDb,
-  db
+  updateReturnInDb
 } from '../services/firebase.js';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-let activeAdminSection = 'dashboard'; // 'dashboard' | 'orders' | 'queries' | 'returns' | 'products' | 'users' | 'coupons'
+import { optimizeImageFile } from '../services/imageOptimizer.js';
+
+let activeAdminSection = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('valeora_active_admin_section') : null) || 'dashboard'; // 'dashboard' | 'orders' | 'queries' | 'returns' | 'products' | 'users' | 'coupons'
 let isAddProductModalOpen = false;
 let isInitiateClaimModalOpen = false;
 let isCouponModalOpen = false;
@@ -44,12 +44,205 @@ let activeOrderFilter = 'all'; // 'all' | 'in-progress' | 'confirmed' | 'process
 let activeReturnFilter = 'all'; // 'all' | 'Return' | 'Exchange' | 'Refund'
 let editingProductId = null;
 let selectedQueryId = null;
+let openAdminEditModal = null;
 
 let liveReturnsCache = [];
 let hasSubscribedReturns = false;
 let liveDbUsers = [];
 let hasSubscribedUsers = false;
 let isDbUsersFetched = false;
+
+export function renderAdminProductCards(products = []) {
+  if (!products || products.length === 0) {
+    return `
+      <div style="grid-column: 1/-1; text-align: center; padding: 48px 20px; background: rgba(255,255,255,0.02); border: 1.5px dashed rgba(214,184,190,0.25); border-radius: 18px; color: #ECCFD0;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 12px; opacity: 0.6;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        <h4 style="color: #FFFFFF; margin: 0 0 8px 0; font-size: 1.05rem;">No products in catalog</h4>
+        <p style="margin: 0; font-size: 0.85rem; color: rgba(214,184,190,0.7);">Click "Add New Product" above to publish your first jewelry piece to the website.</p>
+      </div>
+    `;
+  }
+
+  return products.map(p => {
+    const stock = p.stockQty !== undefined ? Number(p.stockQty) : 25;
+    const isLowStock = stock > 0 && stock <= 3;
+    const isOutOfStock = stock === 0;
+    const stockBadgeClass = isOutOfStock ? 'admin-badge-danger' : (isLowStock ? 'admin-badge-warning' : 'admin-badge-success');
+    const stockText = isOutOfStock ? 'Out of Stock' : (isLowStock ? `${stock} left (Low)` : `${stock} in stock`);
+
+    const sellingPrice = Number(p.price) || 0;
+    const originalPrice = Number(p.originalPrice) || (sellingPrice * 2);
+    const costPrice = Number(p.costPrice) || Math.round(sellingPrice * 0.35);
+    const unitProfit = Math.max(0, sellingPrice - costPrice);
+    const profitMargin = sellingPrice > 0 ? ((unitProfit / sellingPrice) * 100).toFixed(0) : '65';
+
+    return `
+      <div class="admin-product-card" data-card-id="${p.id}" style="background: linear-gradient(155deg, rgba(38, 9, 21, 0.95) 0%, rgba(18, 2, 9, 0.98) 100%); border: 1.5px solid rgba(214, 184, 190, 0.22); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); transition: all 0.2s ease;">
+        <div>
+          <!-- Top Row: Thumbnail + Product Name & Category / Stock Badges -->
+          <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 12px;">
+            <img src="${p.image || '/images/imperial_necklace.jpg'}" alt="${p.name}" style="width: 72px; height: 72px; border-radius: 12px; object-fit: cover; border: 1.5px solid rgba(214, 184, 190, 0.25); flex-shrink: 0;" onerror="this.src='/images/imperial_necklace.jpg'" />
+            <div style="min-width: 0; flex: 1;">
+              <h5 style="color: #FFFFFF; font-size: 0.94rem; font-weight: 700; margin: 0 0 6px 0; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                ${p.name}
+              </h5>
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(214, 184, 190, 0.2); border-radius: 6px; color: #ECCFD0; font-size: 0.72rem; font-weight: 600; padding: 2px 8px;">
+                  ${p.category || 'Jewellery'}
+                </span>
+                ${p.subcategory ? `
+                  <span style="background: rgba(138, 21, 56, 0.35); border: 1px solid rgba(230, 57, 70, 0.4); border-radius: 6px; color: #FFA8B5; font-size: 0.72rem; font-weight: 700; padding: 2px 8px;">
+                    ${p.subcategory}
+                  </span>
+                ` : ''}
+                <span class="admin-badge ${stockBadgeClass}" style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px;">
+                  ${stockText}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Stock Inline Update -->
+          <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); border: 1px solid rgba(214,184,190,0.16); padding: 8px 12px; border-radius: 10px;">
+            <span style="font-size: 0.76rem; color: #ECCFD0; font-weight: 600;">Stock Inventory:</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <input type="number" min="0" value="${stock}" class="admin-quick-stock-input" data-product-id="${p.id}" style="width: 64px; background: rgba(255,255,255,0.08); border: 1px solid rgba(214,184,190,0.3); border-radius: 6px; color: #4EEDA0; font-weight: 700; font-size: 0.82rem; padding: 4px 6px; text-align: center;" />
+              <button class="admin-btn admin-btn-outline quick-stock-save-btn" data-product-id="${p.id}" style="padding: 4px 10px; font-size: 0.74rem; border-color: #4EEDA0; color: #4EEDA0;" title="Save stock quantity">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Price & Actions -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(214,184,190,0.14); padding-top: 12px;">
+          <div>
+            <span style="font-size: 1.15rem; font-weight: 800; font-family: var(--font-brand, serif); color: #FFFFFF;">₹${sellingPrice.toLocaleString('en-IN')}</span>
+          </div>
+
+          <div style="display: flex; gap: 6px;">
+            <button class="admin-btn admin-btn-outline edit-product-btn" data-product-id="${p.id}" style="padding: 6px 12px; font-size: 0.76rem; border-color: rgba(214,184,190,0.35); color: #FFFFFF;" title="Edit product details">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 3px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              Edit
+            </button>
+            <button class="admin-btn admin-btn-danger delete-product-btn" data-product-id="${p.id}" style="padding: 6px 10px; font-size: 0.76rem;" title="Remove from website catalog">
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+export function bindAdminProductCardEvents() {
+  const editProductBtns = document.querySelectorAll('.edit-product-btn');
+  editProductBtns.forEach(btn => {
+    btn.onclick = () => {
+      const pid = btn.getAttribute('data-product-id');
+      if (pid && typeof openAdminEditModal === 'function') openAdminEditModal(pid);
+    };
+  });
+
+  const quickStockBtns = document.querySelectorAll('.quick-stock-save-btn');
+  quickStockBtns.forEach(btn => {
+    btn.onclick = async () => {
+      const pid = btn.getAttribute('data-product-id');
+      const input = document.querySelector(`.admin-quick-stock-input[data-product-id="${pid}"]`);
+      if (pid && input) {
+        const newStock = Math.max(0, parseInt(input.value, 10) || 0);
+        await state.updateProductStock(pid, newStock);
+        showToast(`Stock updated to ${newStock} units for product #${pid}!`, 'success');
+      }
+    };
+  });
+
+  const deleteProductBtns = document.querySelectorAll('.delete-product-btn');
+  deleteProductBtns.forEach(btn => {
+    btn.onclick = async (e) => {
+      if (e) e.stopPropagation();
+      const pid = btn.getAttribute('data-product-id');
+      if (!pid) return;
+
+      const product = (state.products || PRODUCTS || []).find(p => String(p.id) === String(pid));
+      const productName = product ? product.name : `#${pid}`;
+
+      const confirmed = await showConfirmModal({
+        title: 'Remove Product',
+        message: `Are you sure you want to remove "${productName}" from the website catalog? This will delete it across the store.`,
+        confirmText: 'Remove Product',
+        cancelText: 'Cancel',
+        danger: true
+      });
+      if (confirmed) {
+        await state.deleteProduct(pid);
+        showToast('Product removed from catalog across all admin sessions.', 'info');
+        refreshAdminView(true);
+      }
+    };
+  });
+}
+
+export function updateAdminProductsCatalogGrid() {
+  const products = state.products || PRODUCTS || [];
+  const grid = document.getElementById('admin-products-grid-container');
+  if (grid) {
+    grid.innerHTML = renderAdminProductCards(products);
+    bindAdminProductCardEvents();
+  }
+  const headerCount = document.getElementById('admin-products-count-header');
+  if (headerCount) {
+    headerCount.textContent = products.length;
+  }
+  const navBadge = document.querySelector('.admin-nav-item[data-nav-target="products"] .admin-nav-badge');
+  if (navBadge) {
+    navBadge.textContent = products.length;
+  }
+}
+
+export function refreshAdminView(keepScroll = true) {
+  if (state.currentRoute === 'admin' && state.user && state.isAdmin) {
+    const root = document.getElementById('app-root');
+    if (root) {
+      // Guard: only re-render if the root currently holds the admin standalone layout.
+      // This prevents Firestore callbacks from wiping the regular site layout
+      // (navbar + footer) if they fire during a route transition.
+      const adminRoot = root.querySelector('.valeora-admin-standalone-root');
+      if (!adminRoot) return;
+
+      const modalContainer = document.getElementById('admin-add-product-modal-container');
+      const isProductModalOpen = isAddProductModalOpen || (modalContainer && modalContainer.style.display !== 'none');
+      const couponModalContainer = document.getElementById('admin-coupon-modal-container');
+      const isCouponModalActivelyOpen = isCouponModalOpen || (couponModalContainer && couponModalContainer.style.display !== 'none');
+      const claimModalContainer = document.getElementById('admin-claim-modal-container');
+      const isClaimModalActivelyOpen = isInitiateClaimModalOpen || (claimModalContainer && claimModalContainer.style.display !== 'none');
+
+      const isAnyModalOpen = isProductModalOpen || isCouponModalActivelyOpen || isClaimModalActivelyOpen;
+      const isUserTyping = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+
+      const productsGrid = document.getElementById('admin-products-grid-container');
+
+      // If viewing products and a modal is open or user is typing, surgically update only the background catalog grid
+      if (activeAdminSection === 'products' && productsGrid && (isAnyModalOpen || isUserTyping)) {
+        updateAdminProductsCatalogGrid();
+        return;
+      }
+
+      // If an admin is actively interacting with another form/modal, defer full re-render so work is not lost
+      if (isAnyModalOpen || isUserTyping) {
+        return;
+      }
+
+      const scrollY = keepScroll ? (window.scrollY || window.pageYOffset || 0) : 0;
+      root.innerHTML = renderAdminPage();
+      bindAdminPageEvents();
+      if (keepScroll && scrollY > 0) {
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+      }
+    }
+  }
+}
+
 
 function initReturnsSubscription() {
   if (hasSubscribedReturns) return;
@@ -73,9 +266,8 @@ function initReturnsSubscription() {
         }
       });
       localStorage.setItem('valeora_returns', JSON.stringify(localClaims));
-      if (activeAdminSection === 'returns') {
-        const root = document.getElementById('admin-root');
-        if (root) renderAdminPage(root);
+      if (activeAdminSection === 'returns' || activeAdminSection === 'dashboard') {
+        refreshAdminView(true);
       }
     }
   });
@@ -89,8 +281,7 @@ function initUsersSubscription() {
       liveDbUsers = users;
       isDbUsersFetched = true;
       if (activeAdminSection === 'users' || activeAdminSection === 'dashboard') {
-        const root = document.getElementById('admin-root');
-        if (root) renderAdminPage(root);
+        refreshAdminView(true);
       }
     }
   });
@@ -126,9 +317,8 @@ async function syncDbUsers() {
     if (Array.isArray(dbUsers)) {
       liveDbUsers = dbUsers;
       isDbUsersFetched = true;
-      if (activeAdminSection === 'users') {
-        const root = document.getElementById('admin-root');
-        if (root) renderAdminPage(root);
+      if (activeAdminSection === 'users' || activeAdminSection === 'dashboard') {
+        refreshAdminView(true);
       }
     }
   } catch (err) {
@@ -139,22 +329,10 @@ async function syncDbUsers() {
 function getAdminUsers() {
   initUsersSubscription();
   syncDbUsers();
-  const raw = localStorage.getItem('valeora_registered_users');
+  
   let users = [];
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        users = parsed.filter(u =>
-          (u.email || '').toLowerCase() !== 'pooja.sharma@example.com' &&
-          (u.email || '').toLowerCase() !== 'priya.s@techcorp.io' &&
-          (u.email || '').toLowerCase() !== 'ananya.v@lifestyle.in'
-        );
-      }
-    } catch (e) { }
-  }
 
-  // Merge with Firestore live registered users
+  // Use only Firestore live registered users (from database)
   liveDbUsers.forEach(dbu => {
     const dEmail = (dbu.email || '').toLowerCase();
     if (dEmail && !users.some(u => (u.email || '').toLowerCase() === dEmail)) {
@@ -168,77 +346,6 @@ function getAdminUsers() {
         membership: dbu.membership || 'Valeora Atelier Patron',
         memberSince: dbu.memberSince || '2026',
         status: dbu.status || 'active'
-      });
-    }
-  });
-
-  // Include known registered auth user from Firebase Console if not yet in snapshot
-  const registeredAuthUsers = [
-    { email: 'akashsharma200409@gmail.com', uid: 'Fx78xsLqvMV5Slhz97WJTb6j6', name: 'Akash Sharma' },
-    { email: 'valeora.shop@gmail.com', uid: 'vWHGlC0lAJPdIVCDLbHL9A1', name: 'Valeora Admin' }
-  ];
-  registeredAuthUsers.forEach(au => {
-    const aEmail = au.email.toLowerCase();
-    if (!users.some(u => (u.email || '').toLowerCase() === aEmail)) {
-      const isAdm = aEmail.includes('valeora.shop') || aEmail.includes('admin');
-      users.push({
-        id: `USR-${au.uid.slice(0, 5).toUpperCase()}`,
-        name: au.name,
-        email: au.email,
-        phone: '+91 98765 43210',
-        city: 'New Delhi',
-        pincode: '110058',
-        membership: isAdm ? 'Administrator' : 'Valeora Atelier Patron',
-        memberSince: '11 Sept 2026',
-        status: 'active'
-      });
-      // Ensure Firestore document exists in background
-      try {
-        setDoc(doc(db, 'users', au.uid), {
-          uid: au.uid,
-          name: au.name,
-          email: au.email,
-          role: isAdm ? 'admin' : 'customer',
-          membership: isAdm ? 'Administrator' : 'Valeora Atelier Patron',
-          memberSince: '11 Sept 2026',
-          createdAt: serverTimestamp()
-        }, { merge: true }).catch(() => { });
-      } catch (e) { }
-    }
-  });
-
-  // Include current active customer patron if logged in and not admin
-  if (state.user && !state.isAdmin && state.user.email && (state.user.email || '').toLowerCase() !== 'pooja.sharma@example.com') {
-    if (!users.some(u => (u.email || '').toLowerCase() === (state.user.email || '').toLowerCase())) {
-      users.push({
-        id: `USR-${(state.user.uid || 'LIVE').slice(0, 5).toUpperCase()}`,
-        name: state.user.name || 'Patron',
-        email: state.user.email,
-        phone: state.user.phone || '',
-        city: state.user.city || '',
-        pincode: state.user.pincode || '',
-        membership: state.user.membership || 'Valeora Atelier Patron',
-        memberSince: state.user.memberSince || '2026',
-        status: 'active'
-      });
-    }
-  }
-
-  // Also include patrons from real live orders
-  (state.orders || []).forEach((ord, idx) => {
-    const ordEmail = (ord.email || (ord.shippingAddress && ord.shippingAddress.email) || '').toLowerCase();
-    const ordName = ord.customerName || ord.customer || (ord.shippingAddress && ord.shippingAddress.fullName) || '';
-    if (ordEmail && ordEmail !== 'pooja.sharma@example.com' && !users.some(u => (u.email || '').toLowerCase() === ordEmail)) {
-      users.push({
-        id: `USR-${8500 + idx}`,
-        name: ordName || 'Patron',
-        email: ordEmail,
-        phone: ord.phone || (ord.shippingAddress && ord.shippingAddress.phone) || '',
-        city: ord.shippingAddress?.city || '',
-        pincode: ord.shippingAddress?.pincode || '',
-        membership: 'Valeora Atelier Patron',
-        memberSince: ord.date || '2026',
-        status: 'active'
       });
     }
   });
@@ -447,7 +554,7 @@ export function renderAdminPage() {
           color: #FFFFFF;
           display: flex;
           font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-          z-index: 999999;
+          z-index: 1000;
           overflow: hidden;
         }
 
@@ -2278,7 +2385,7 @@ export function renderAdminPage() {
               <div class="admin-panel-head" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
                 <div>
                   <h3 style="font-family: var(--font-brand, serif); font-size: 1.3rem; margin: 0; color: #FFFFFF;">
-                    Product Catalog & Live Website Inventory (${products.length})
+                    Product Catalog & Live Website Inventory (<span id="admin-products-count-header">${products.length}</span>)
                   </h3>
                 </div>
                 <button class="admin-btn admin-btn-primary" id="btn-open-add-product-modal-2" style="margin-left: auto;">
@@ -2287,77 +2394,8 @@ export function renderAdminPage() {
                 </button>
               </div>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 18px;">
-                ${products.map(p => {
-        const stock = p.stockQty !== undefined ? Number(p.stockQty) : 25;
-        const isLowStock = stock > 0 && stock <= 3;
-        const isOutOfStock = stock === 0;
-        const stockBadgeClass = isOutOfStock ? 'admin-badge-danger' : (isLowStock ? 'admin-badge-warning' : 'admin-badge-success');
-        const stockText = isOutOfStock ? 'Out of Stock' : (isLowStock ? `${stock} left (Low)` : `${stock} in stock`);
-
-        const sellingPrice = Number(p.price) || 0;
-        const originalPrice = Number(p.originalPrice) || (sellingPrice * 2);
-        const costPrice = Number(p.costPrice) || Math.round(sellingPrice * 0.35);
-        const unitProfit = Math.max(0, sellingPrice - costPrice);
-        const profitMargin = sellingPrice > 0 ? ((unitProfit / sellingPrice) * 100).toFixed(0) : '65';
-
-        return `
-                    <div class="admin-product-card" style="background: linear-gradient(155deg, rgba(38, 9, 21, 0.95) 0%, rgba(18, 2, 9, 0.98) 100%); border: 1.5px solid rgba(214, 184, 190, 0.22); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); transition: all 0.2s ease;">
-                      <div>
-                        <!-- Top Row: Thumbnail + Product Name & Category / Stock Badges -->
-                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 12px;">
-                          <img src="${p.image || '/images/imperial_necklace.jpg'}" alt="${p.name}" style="width: 72px; height: 72px; border-radius: 12px; object-fit: cover; border: 1.5px solid rgba(214, 184, 190, 0.25); flex-shrink: 0;" onerror="this.src='/images/imperial_necklace.jpg'" />
-                          <div style="min-width: 0; flex: 1;">
-                            <h5 style="color: #FFFFFF; font-size: 0.94rem; font-weight: 700; margin: 0 0 6px 0; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
-                              ${p.name}
-                            </h5>
-                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                              <span style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(214, 184, 190, 0.2); border-radius: 6px; color: #ECCFD0; font-size: 0.72rem; font-weight: 600; padding: 2px 8px;">
-                                ${p.category || 'Jewellery'}
-                              </span>
-                              ${p.subcategory ? `
-                                <span style="background: rgba(138, 21, 56, 0.35); border: 1px solid rgba(230, 57, 70, 0.4); border-radius: 6px; color: #FFA8B5; font-size: 0.72rem; font-weight: 700; padding: 2px 8px;">
-                                  ${p.subcategory}
-                                </span>
-                              ` : ''}
-                              <span class="admin-badge ${stockBadgeClass}" style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px;">
-                                ${stockText}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <!-- Quick Stock Inline Update -->
-                        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); border: 1px solid rgba(214,184,190,0.16); padding: 8px 12px; border-radius: 10px;">
-                          <span style="font-size: 0.76rem; color: #ECCFD0; font-weight: 600;">Stock Inventory:</span>
-                          <div style="display: flex; align-items: center; gap: 6px;">
-                            <input type="number" min="0" value="${stock}" class="admin-quick-stock-input" data-product-id="${p.id}" style="width: 64px; background: rgba(255,255,255,0.08); border: 1px solid rgba(214,184,190,0.3); border-radius: 6px; color: #4EEDA0; font-weight: 700; font-size: 0.82rem; padding: 4px 6px; text-align: center;" />
-                            <button class="admin-btn admin-btn-outline quick-stock-save-btn" data-product-id="${p.id}" style="padding: 4px 10px; font-size: 0.74rem; border-color: #4EEDA0; color: #4EEDA0;" title="Save stock quantity">
-                              Save
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- Bottom Price & Actions -->
-                      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(214,184,190,0.14); padding-top: 12px;">
-                        <div>
-                          <span style="font-size: 1.15rem; font-weight: 800; font-family: var(--font-brand, serif); color: #FFFFFF;">₹${sellingPrice.toLocaleString('en-IN')}</span>
-                        </div>
-
-                        <div style="display: flex; gap: 6px;">
-                          <button class="admin-btn admin-btn-outline edit-product-btn" data-product-id="${p.id}" style="padding: 6px 12px; font-size: 0.76rem; border-color: rgba(214,184,190,0.35); color: #FFFFFF;" title="Edit product details">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 3px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                            Edit
-                          </button>
-                          <button class="admin-btn admin-btn-danger delete-product-btn" data-product-id="${p.id}" style="padding: 6px 10px; font-size: 0.76rem;" title="Remove from website catalog">
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  `;
-      }).join('')}
+              <div id="admin-products-grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 18px;">
+                ${renderAdminProductCards(products)}
               </div>
             </div>
           ` : ''}
@@ -2679,12 +2717,12 @@ export function renderAdminPage() {
 
                   <div class="admin-gallery-slots-grid">
                     <!-- Slot 0 (Main) -->
-                    <div class="admin-gallery-slot has-image" id="np-slot-container-0" data-slot-index="0" title="Click or drop to change Photo 1">
+                    <div class="admin-gallery-slot" id="np-slot-container-0" data-slot-index="0" title="Click or drop Photo 1 (Cover)">
                       <span class="admin-slot-badge">Photo 1 (Cover)</span>
-                      <input type="hidden" id="np-image-data-0" value="/images/imperial_necklace.jpg" />
+                      <input type="hidden" id="np-image-data-0" value="" />
                       <input type="file" id="np-file-input-0" accept="image/*" style="display: none;" />
-                      <img id="np-slot-preview-0" src="/images/imperial_necklace.jpg" class="admin-slot-preview-img" alt="Photo 1" />
-                      <div id="np-slot-empty-0" style="display: none; flex-direction: column; align-items: center; gap: 4px;">
+                      <img id="np-slot-preview-0" src="" class="admin-slot-preview-img" style="display: none;" alt="Photo 1" />
+                      <div id="np-slot-empty-0" style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                         <span style="font-size: 0.68rem; color: #ECCFD0;">+ Main Photo</span>
                       </div>
@@ -2738,11 +2776,7 @@ export function renderAdminPage() {
                   <input type="text" id="np-description" class="admin-input-field" style="padding: 7px 12px; font-size: 0.83rem;" placeholder="e.g. Handcrafted royal emerald choker with sparkling ruby crystals." required />
                 </div>
 
-                <!-- Product Highlights -->
-                <div class="admin-form-group" style="grid-column: span 2; margin-bottom: 0;">
-                  <label style="font-size: 0.76rem; margin-bottom: 3px;">Highlights (Comma separated)</label>
-                  <input type="text" id="np-highlights" class="admin-input-field" style="padding: 7px 12px; font-size: 0.83rem;" placeholder="e.g. Anti-tarnish polish, 18K gold coat, Hypoallergenic alloy" />
-                </div>
+
               </div>
 
               <!-- Submit Buttons -->
@@ -2956,6 +2990,7 @@ export function bindAdminPageEvents() {
       const target = btn.getAttribute('data-nav-target');
       if (target) {
         activeAdminSection = target;
+        try { sessionStorage.setItem('valeora_active_admin_section', target); } catch (e) { }
         state._notify({ route: true });
       }
     });
@@ -3047,14 +3082,21 @@ export function bindAdminPageEvents() {
         fileInput.click();
       });
 
-      fileInput.addEventListener('change', (e) => {
+      fileInput.addEventListener('change', async (e) => {
         const file = e.target.files && e.target.files[0];
         if (file) {
-          const reader = new FileReader();
-          reader.onload = (loadEvt) => {
-            setGallerySlot(i, loadEvt.target.result);
-          };
-          reader.readAsDataURL(file);
+          try {
+            showToast('Optimizing image for fast multi-admin synchronization...', 'info');
+            const optimized = await optimizeImageFile(file, 1000, 0.8);
+            setGallerySlot(i, optimized);
+          } catch (err) {
+            console.warn('Image optimization fallback:', err);
+            const reader = new FileReader();
+            reader.onload = (loadEvt) => {
+              setGallerySlot(i, loadEvt.target.result);
+            };
+            reader.readAsDataURL(file);
+          }
         }
       });
 
@@ -3067,17 +3109,24 @@ export function bindAdminPageEvents() {
         slotContainer.classList.remove('dragover');
       });
 
-      slotContainer.addEventListener('drop', (e) => {
+      slotContainer.addEventListener('drop', async (e) => {
         e.preventDefault();
         slotContainer.classList.remove('dragover');
         if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
           const file = e.dataTransfer.files[0];
           if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (loadEvt) => {
-              setGallerySlot(i, loadEvt.target.result);
-            };
-            reader.readAsDataURL(file);
+            try {
+              showToast('Optimizing image for fast multi-admin synchronization...', 'info');
+              const optimized = await optimizeImageFile(file, 1000, 0.8);
+              setGallerySlot(i, optimized);
+            } catch (err) {
+              console.warn('Drop image optimization fallback:', err);
+              const reader = new FileReader();
+              reader.onload = (loadEvt) => {
+                setGallerySlot(i, loadEvt.target.result);
+              };
+              reader.readAsDataURL(file);
+            }
           } else {
             showToast('Please drop a valid image file (PNG, JPG, WebP).', 'error');
           }
@@ -3157,7 +3206,7 @@ export function bindAdminPageEvents() {
     if (submitBtn) submitBtn.textContent = 'Publish Product to Website';
 
     updateSubcategoryDropdown('For Her', 'Necklace');
-    setGallerySlot(0, '/images/imperial_necklace.jpg');
+    setGallerySlot(0, '');
     setGallerySlot(1, '');
     setGallerySlot(2, '');
     setGallerySlot(3, '');
@@ -3182,7 +3231,7 @@ export function bindAdminPageEvents() {
     const stockInput = document.getElementById('np-stock');
     const badgeSelect = document.getElementById('np-badge');
     const descInput = document.getElementById('np-description');
-    const highlightsInput = document.getElementById('np-highlights');
+
 
     if (nameInput) nameInput.value = p.name || '';
 
@@ -3211,20 +3260,21 @@ export function bindAdminPageEvents() {
     // Pre-populate 4 gallery slots
     const gImgs = (Array.isArray(p.galleryImages) && p.galleryImages.length > 0)
       ? p.galleryImages.filter(Boolean)
-      : [p.image || '/images/imperial_necklace.jpg'];
+      : (p.image ? [p.image] : []);
 
     for (let i = 0; i < 4; i++) {
       setGallerySlot(i, gImgs[i] || '');
     }
 
     if (descInput) descInput.value = p.description || '';
-    if (highlightsInput) {
-      highlightsInput.value = Array.isArray(p.highlights) ? p.highlights.join(', ') : (p.highlights || '');
-    }
+
 
     isAddProductModalOpen = true;
     if (modalContainer) modalContainer.style.display = 'flex';
   };
+
+  openAdminEditModal = openEditModal;
+  bindAdminProductCardEvents();
 
   const closeModal = () => {
     isAddProductModalOpen = false;
@@ -3236,33 +3286,9 @@ export function bindAdminPageEvents() {
   if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
   if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeModal);
 
-  // Edit Product Buttons in catalog cards
-  const editProductBtns = document.querySelectorAll('.edit-product-btn');
-  editProductBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const pid = btn.getAttribute('data-product-id');
-      if (pid) openEditModal(pid);
-    });
-  });
-
-  // Quick Stock Save Buttons
-  const quickStockBtns = document.querySelectorAll('.quick-stock-save-btn');
-  quickStockBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const pid = btn.getAttribute('data-product-id');
-      const input = document.querySelector(`.admin-quick-stock-input[data-product-id="${pid}"]`);
-      if (pid && input) {
-        const newStock = Math.max(0, parseInt(input.value, 10) || 0);
-        state.updateProductStock(pid, newStock);
-        showToast(`Stock updated to ${newStock} units for product #${pid}!`, 'success');
-        state._notify({ route: true });
-      }
-    });
-  });
-
   // Add / Edit Product Form Submit
   if (addForm) {
-    addForm.addEventListener('submit', (e) => {
+    addForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('np-name')?.value.trim();
       const category = document.getElementById('np-category')?.value || 'For Her';
@@ -3274,82 +3300,82 @@ export function bindAdminPageEvents() {
       const stockQty = Math.max(0, Number(document.getElementById('np-stock')?.value) || 0);
       const badge = document.getElementById('np-badge')?.value || 'New Arrival';
       const galleryImages = getGalleryImages();
-      const image = galleryImages[0] || '/images/imperial_necklace.jpg';
-      if (galleryImages.length === 0) {
-        galleryImages.push(image);
+      const image = galleryImages[0] || '';
+      if (!image) {
+        showToast('Please upload at least 1 product image (Photo 1 Cover).', 'error');
+        return;
       }
       const description = document.getElementById('np-description')?.value.trim();
-      const highlights = document.getElementById('np-highlights')?.value.trim();
+
       const tagline = `${category} · ${subcategory}`;
 
-      if (!name || !price || !image || !description) {
+      if (!name || !price || !description) {
         showToast('Please complete all required product fields.', 'error');
         return;
       }
 
-      if (editingProductId) {
-        state.updateProduct(editingProductId, {
-          name,
-          tagline,
-          category,
-          subcategory,
-          audience,
-          price,
-          originalPrice,
-          costPrice,
-          stockQty,
-          badge,
-          image,
-          galleryImages,
-          description,
-          highlights
-        });
-        showToast(`"${name}" (${subcategory}) updated successfully!`, 'success');
-      } else {
-        state.addProduct({
-          name,
-          tagline,
-          category,
-          subcategory,
-          audience,
-          price,
-          originalPrice,
-          costPrice,
-          stockQty,
-          badge,
-          image,
-          galleryImages,
-          description,
-          highlights
-        });
-        showToast(`"${name}" (${subcategory}) published and now live on website!`, 'success');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.7';
+        submitBtn.textContent = editingProductId ? 'Saving Changes to Cloud...' : 'Publishing & Syncing Across Admins...';
       }
 
-      closeModal();
-      addForm.reset();
-      state._notify({ route: true });
+      try {
+        if (editingProductId) {
+          await state.updateProduct(editingProductId, {
+            name,
+            tagline,
+            category,
+            subcategory,
+            audience,
+            price,
+            originalPrice,
+            costPrice,
+            stockQty,
+            badge,
+            image,
+            galleryImages,
+            description
+          });
+          showToast(`"${name}" (${subcategory}) updated & synchronized across all admins!`, 'success');
+        } else {
+          await state.addProduct({
+            name,
+            tagline,
+            category,
+            subcategory,
+            audience,
+            price,
+            originalPrice,
+            costPrice,
+            stockQty,
+            badge,
+            image,
+            galleryImages,
+            description
+          });
+          showToast(`"${name}" published! Live on website & synchronized across all admin sessions.`, 'success');
+        }
+
+        closeModal();
+        addForm.reset();
+        editingProductId = null;
+        isAddProductModalOpen = false;
+        refreshAdminView(true);
+      } catch (err) {
+        console.error('Error in product publish submit:', err);
+        showToast('Error syncing product to cloud. Please try again.', 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+          submitBtn.textContent = editingProductId ? 'Save Changes' : 'Publish Product to Website';
+        }
+      }
     });
   }
 
-  // Delete product button
-  const deleteProductBtns = document.querySelectorAll('.delete-product-btn');
-  deleteProductBtns.forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const pid = btn.getAttribute('data-product-id');
-      const confirmed = await showConfirmModal({
-        title: 'Remove Product',
-        message: 'Are you sure you want to remove this product from the website catalog?',
-        confirmText: 'Remove Product',
-        cancelText: 'Cancel',
-        danger: true
-      });
-      if (confirmed) {
-        state.deleteProduct(pid);
-        showToast('Product removed from catalog.', 'info');
-        state._notify({ route: true });
-      }
-    });
-  });
+  // Note: Delete product button events are securely bound in bindAdminProductCardEvents() called above
 
   // Order status changing
   const statusSelectors = document.querySelectorAll('.order-status-changer');
@@ -3456,7 +3482,7 @@ export function bindAdminPageEvents() {
     const resolvedCustName = getCustName(matchedOrder);
     const resolvedEmail = getCustEmail(matchedOrder);
     const resolvedPhone = getCustPhone(matchedOrder);
-    const resolvedProduct = (matchedOrder && matchedOrder.items && matchedOrder.items[0]) || (products && products[0]) || { id: 'imperial-ruby-choker-masterpiece', name: 'Royal Ruby & Crystal Choker Necklace' };
+    const resolvedProduct = (matchedOrder && matchedOrder.items && matchedOrder.items[0]) || (products && products[0]) || null;
     const resolvedAmount = matchedOrder ? (matchedOrder.total || (resolvedProduct ? resolvedProduct.price : 599)) : (resolvedProduct ? resolvedProduct.price : 599);
 
     claimModalData = {
@@ -3469,7 +3495,7 @@ export function bindAdminPageEvents() {
       productId: resolvedProduct ? resolvedProduct.id : '',
       productName: resolvedProduct ? resolvedProduct.name : '',
       amount: resolvedAmount,
-      reason: q.subject ? `${q.subject}` : (type === 'Exchange' ? 'Ring / Choker Fitment Sizing Adjustment' : 'Patron Return - 7-Day Window'),
+      reason: q.subject ? `${q.subject}` : (type === 'Exchange' ? 'Fitment / Sizing Adjustment' : 'Patron Return Request'),
       details: q.message ? `Inquiry request: "${q.message.substring(0, 100)}"` : 'Resolution initiated by concierge admin.',
       draftResponse: getDefaultClaimReply(type, q.id)
     };
@@ -3650,6 +3676,7 @@ export function bindAdminPageEvents() {
       if (qid) {
         selectedQueryId = qid;
         activeAdminSection = 'queries';
+        try { sessionStorage.setItem('valeora_active_admin_section', 'queries'); } catch (e) { }
         state._notify({ route: true });
       }
     });
@@ -3971,7 +3998,6 @@ export function bindAdminPageEvents() {
           return;
         }
       }
-
       isCouponModalOpen = false;
       editingCouponId = null;
       state._notify({ route: true });
@@ -3990,7 +4016,7 @@ export function bindAdminPageEvents() {
         const nextState = cp.active === false;
         state.updateCoupon(cid, { active: nextState });
         showToast(`Coupon ${cp.code} is now ${nextState ? 'Active' : 'Paused'}.`, nextState ? 'success' : 'info');
-        state._notify({ route: true });
+        refreshAdminView(true);
       }
     });
   });
@@ -4014,7 +4040,7 @@ export function bindAdminPageEvents() {
           isActive: cp.active !== false
         };
         isCouponModalOpen = true;
-        state._notify({ route: true });
+        refreshAdminView(true);
       }
     });
   });
@@ -4040,7 +4066,7 @@ export function bindAdminPageEvents() {
       if (confirmed) {
         state.deleteCoupon(cid);
         showToast(`Coupon ${cp.code} deleted successfully.`, 'info');
-        state._notify({ route: true });
+        refreshAdminView(true);
       }
     });
   });

@@ -457,6 +457,13 @@ export function bindAuthEvents() {
         }
 
         state.setFirebaseUser(user, userData);
+        state.recordRegisteredUser({
+          uid: user.uid,
+          name: userData?.name || user.displayName || email.split('@')[0],
+          email: user.email,
+          phone: userData?.phone || user.phoneNumber || '',
+          role: 'customer'
+        });
         state.toggleAuthModal(false);
         state.toggleCheckoutModal(false);
         showToast(`Welcome back, ${state.user.name}!`, 'success');
@@ -536,7 +543,14 @@ export function bindAuthEvents() {
       }
 
       try {
-        await registerWithEmail(email, password, name, `+91 ${phone}`);
+        const regUser = await registerWithEmail(email, password, name, `+91 ${phone}`);
+        state.recordRegisteredUser({
+          uid: regUser?.uid || null,
+          name: name,
+          email: email,
+          phone: `+91 ${phone}`,
+          role: 'customer'
+        });
         // Log out immediately so the session does not auto-login to user profile
         try {
           await logoutUser();
@@ -633,6 +647,13 @@ export function bindAuthEvents() {
         }
 
         state.setFirebaseUser(user, userData);
+        state.recordRegisteredUser({
+          uid: user.uid,
+          name: userData?.name || user.displayName || user.email.split('@')[0],
+          email: user.email,
+          phone: userData?.phone || user.phoneNumber || '',
+          role: 'customer'
+        });
         state.toggleAuthModal(false);
         state.toggleCheckoutModal(false);
         showToast(`Signed in as ${state.user.name}`, 'success');
